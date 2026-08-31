@@ -1,0 +1,64 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="ER Diagram" id="0">
+    <mxGraphModel dx="1413" dy="609" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="nvCZDArDSNdG6Qxgb9Yt-1" edge="1" parent="1" source="SUBJECT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="EXAM_PAPER">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="nvCZDArDSNdG6Qxgb9Yt-2" edge="1" parent="1" source="SUBJECT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="UNIT">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="SUBJECT" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;SUBJECT&lt;/b&gt;&lt;br&gt;subject_id PK&lt;br&gt;subject_code&lt;br&gt;subject_name&lt;br&gt;department" vertex="1">
+          <mxGeometry height="110" width="200" x="40" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="UNIT" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;UNIT&lt;/b&gt;&lt;br&gt;unit_id PK&lt;br&gt;subject_id FK&lt;br&gt;unit_number&lt;br&gt;unit_name" vertex="1">
+          <mxGeometry height="110" width="200" x="320" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="TOPIC" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;TOPIC&lt;/b&gt;&lt;br&gt;topic_id PK&lt;br&gt;unit_id FK&lt;br&gt;topic_name" vertex="1">
+          <mxGeometry height="110" width="200" x="640" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="SEMESTER" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;SEMESTER&lt;/b&gt;&lt;br&gt;semester_id PK&lt;br&gt;semester_number&lt;br&gt;academic_year" vertex="1">
+          <mxGeometry height="110" width="200" x="40" y="445" as="geometry" />
+        </mxCell>
+        <mxCell id="nvCZDArDSNdG6Qxgb9Yt-3" edge="1" parent="1" source="EXAM_PAPER" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="PAPER_QUESTION">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="EXAM_PAPER" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;EXAM_PAPER&lt;/b&gt;&lt;br&gt;paper_id PK&lt;br&gt;subject_id FK&lt;br&gt;semester_id FK&lt;br&gt;exam_type&lt;br&gt;total_marks" vertex="1">
+          <mxGeometry height="110" width="200" x="40" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="QUESTION_TYPE" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;QUESTION_TYPE&lt;/b&gt;&lt;br&gt;type_id PK&lt;br&gt;type_name" vertex="1">
+          <mxGeometry height="110" width="200" x="890" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="QUESTION" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;QUESTION&lt;/b&gt;&lt;br&gt;question_id PK&lt;br&gt;type_id FK&lt;br&gt;question_text&lt;br&gt;vector_id" vertex="1">
+          <mxGeometry height="110" width="200" x="890" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="PAPER_QUESTION" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;PAPER_QUESTION&lt;/b&gt;&lt;br&gt;paper_id FK&lt;br&gt;question_id FK&lt;br&gt;question_number&lt;br&gt;marks" vertex="1">
+          <mxGeometry height="110" width="200" x="470" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="QUESTION_TOPIC" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;QUESTION_TOPIC&lt;/b&gt;&lt;br&gt;question_id FK&lt;br&gt;topic_id FK" vertex="1">
+          <mxGeometry height="110" width="200" x="890" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="UNIT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="TOPIC" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="SEMESTER" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="EXAM_PAPER" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="QUESTION" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="PAPER_QUESTION" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="QUESTION_TYPE" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="QUESTION" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="QUESTION" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="QUESTION_TOPIC" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="TOPIC" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="QUESTION_TOPIC" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
