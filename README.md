@@ -8,3 +8,4 @@ The system stores question papers along with information such as subjects, units
 
 The system is intended to provide evidence-based examination insights rather than predict or guarantee future questions, helping students make more informed study decisions based on historical patterns.
 <img width="903" height="1310" alt="image" src="https://github.com/user-attachments/assets/29481e40-4abe-4578-8a8d-612d9420c7b4" />
+<img width="1673" height="660" alt="image" src="https://github.com/user-attachments/assets/cab50a28-cad9-473b-9292-3a394fe498ca" />
