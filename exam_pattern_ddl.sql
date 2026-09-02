@@ -1,6 +1,7 @@
 -- Historical Examination Pattern Analysis System
 -- DDL Statements 
-
+CREATE DATABASE exam_pattern;
+USE exam_pattern;
 
 
 CREATE TABLE SUBJECT (
