@@ -9,3 +9,43 @@ The system stores question papers along with information such as subjects, units
 The system is intended to provide evidence-based examination insights rather than predict or guarantee future questions, helping students make more informed study decisions based on historical patterns.
 <img width="903" height="1310" alt="image" src="https://github.com/user-attachments/assets/29481e40-4abe-4578-8a8d-612d9420c7b4" />
 <img width="1673" height="660" alt="image" src="https://github.com/user-attachments/assets/cab50a28-cad9-473b-9292-3a394fe498ca" />
+
+## Suggested project modules
+
+Build the first version as a **modular monolith**: one application with clear
+module boundaries. This keeps deployment and development simple while making
+each part easier to test and maintain.
+
+| Module | Responsibilities |
+| --- | --- |
+| Paper ingestion | Add an exam paper, enter or extract its questions, and associate it with a subject, semester, and exam type. |
+| Academic catalog | Manage subjects, semesters, units, topics, and question types. |
+| Question and paper management | Store questions and their marks/question numbers on papers; connect questions to one or more syllabus topics. |
+| Database access | Own relational persistence, transactions, validation, and queries for the tables in `exam_pattern_ddl.sql`. |
+| Semantic search | Create embeddings for question text, store them in a vector index, and retrieve semantically similar questions. |
+| Pattern analytics | Calculate topic and unit weightage, topic frequency, question-type distribution, recurring concepts, and trends across semesters. |
+| API and user interface | Expose the application features and let students search questions, explore statistics, and compare historical patterns. |
+
+### Suggested boundaries and data flow
+
+1. Paper ingestion validates a paper and its questions, then asks the question/paper and academic catalog modules to save the structured data.
+2. After a question is saved, semantic search generates and stores its embedding. Keep the relational `question_id` as the stable link to the vector record; do not treat a vector-store ID as the question itself.
+3. Pattern analytics reads the relational data for counts and marks, and can use semantic search to group differently worded questions about similar concepts.
+4. The API coordinates requests from the UI and calls the relevant modules. The UI should not access either database directly.
+
+Keep the relational database as the source of truth for papers, marks, subjects,
+and syllabus mappings. Treat embeddings as derived data that can be regenerated
+from saved question text.
+
+### Recommended starter stack
+
+- **Backend/API:** Python with FastAPI
+- **Relational and vector storage:** PostgreSQL with the `pgvector` extension
+- **Embeddings:** a sentence-transformer model, wrapped behind the semantic search module
+- **Frontend:** React with TypeScript
+
+Using PostgreSQL with `pgvector` keeps structured records and vector search in
+one database for an initial implementation. The current
+`exam_pattern_ddl.sql` uses SQLite-style `AUTOINCREMENT` and also includes
+`CREATE DATABASE`/`USE` statements; it will need to be adapted to PostgreSQL
+before using this recommended stack.
