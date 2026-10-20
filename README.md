@@ -46,6 +46,28 @@ from saved question text.
 
 Using PostgreSQL with `pgvector` keeps structured records and vector search in
 one database for an initial implementation. The current
-`exam_pattern_ddl.sql` uses SQLite-style `AUTOINCREMENT` and also includes
-`CREATE DATABASE`/`USE` statements; it will need to be adapted to PostgreSQL
-before using this recommended stack.
+`exam_pattern_ddl.sql` is PostgreSQL-compatible. Create and connect to the
+`exam_pattern` database before running it.
+
+### First module: paper ingestion
+
+The initial FastAPI backend accepts an exam paper and its questions in one
+request. It validates the subject, semester, question types, and topic mappings,
+then saves the paper and all related records in one transaction. Referenced
+subjects, semesters, question types, units, and topics must already exist;
+catalog management is a separate module. A question's topics must belong to the
+paper's subject. Embeddings are intentionally not generated during ingestion;
+semantic search can add them later as derived data.
+
+To run the API locally:
+
+1. Create a PostgreSQL database named `exam_pattern` and run
+   `exam_pattern_ddl.sql` against it.
+2. Install dependencies with `pip install -r backend/requirements.txt`.
+3. Set `DATABASE_URL` using the format in `backend/.env.example`.
+4. Start the API from the `backend` directory with
+   `uvicorn app.main:app --reload`.
+5. Open `/docs` on the local server to try `POST /api/v1/papers`.
+
+Install `backend/requirements-dev.txt` and run `pytest` from the `backend`
+directory to execute the ingestion tests using an in-memory SQLite database.
