@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 
 def create_database_engine(database_url: str | None = None) -> Engine:
-    url = database_url or os.getenv("DATABASE_URL")
-    if not url:
-        raise RuntimeError("DATABASE_URL must be set to connect to PostgreSQL.")
+    url = database_url or os.getenv("DATABASE_URL") or "sqlite:///./app.db"
+    if url.startswith("sqlite"):
+        return create_engine(url, connect_args={"check_same_thread": False}, pool_pre_ping=True)
     return create_engine(url, pool_pre_ping=True)
 
 
