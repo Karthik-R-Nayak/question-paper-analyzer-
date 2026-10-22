@@ -1,8 +1,7 @@
 from enum import Enum
 from typing import Annotated
 
-from pydantic import BaseModel, Field, StringConstraints
-from pydantic import field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 
 class ExamType(str, Enum):
@@ -20,6 +19,101 @@ QuestionText = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1),
 ]
+SubjectCode = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=20),
+]
+SubjectName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
+]
+DepartmentName = Annotated[
+    str | None,
+    StringConstraints(strip_whitespace=True, max_length=100),
+]
+AcademicYear = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=9),
+]
+UnitName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=150),
+]
+TopicName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=150),
+]
+QuestionTypeName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=50),
+]
+
+
+class SubjectCreate(BaseModel):
+    subject_code: SubjectCode
+    subject_name: SubjectName
+    department: DepartmentName = None
+
+
+class SubjectRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    subject_id: int
+    subject_code: str
+    subject_name: str
+    department: str | None
+
+
+class SemesterCreate(BaseModel):
+    semester_number: int = Field(ge=1, le=8)
+    academic_year: AcademicYear
+
+
+class SemesterRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    semester_id: int
+    semester_number: int
+    academic_year: str
+
+
+class UnitCreate(BaseModel):
+    subject_id: int = Field(gt=0)
+    unit_number: int = Field(gt=0)
+    unit_name: UnitName
+
+
+class UnitRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    unit_id: int
+    subject_id: int
+    unit_number: int
+    unit_name: str
+
+
+class TopicCreate(BaseModel):
+    unit_id: int = Field(gt=0)
+    topic_name: TopicName
+
+
+class TopicRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    topic_id: int
+    unit_id: int
+    topic_name: str
+
+
+class QuestionTypeCreate(BaseModel):
+    type_name: QuestionTypeName
+
+
+class QuestionTypeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    type_id: int
+    type_name: str
 
 
 class PaperQuestionCreate(BaseModel):

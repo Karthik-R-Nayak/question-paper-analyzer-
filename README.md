@@ -59,6 +59,16 @@ catalog management is a separate module. A question's topics must belong to the
 paper's subject. Embeddings are intentionally not generated during ingestion;
 semantic search can add them later as derived data.
 
+### Second module: academic catalog
+
+The academic catalog API manages subjects, semesters, units, topics, and
+question types under `/api/v1/catalog`. Each catalog resource supports
+create, list, get, and replace operations, plus deletion. Updates use `PUT`.
+Unique-key and relational conflicts return `409`; missing records return `404`.
+Deletes follow the foreign-key behavior in `exam_pattern_ddl.sql`, so deleting
+a subject, semester, unit, or topic can cascade to related historical records.
+A question type cannot be deleted while questions use it.
+
 To run the API locally:
 
 1. Create a PostgreSQL database named `exam_pattern` and run
@@ -67,7 +77,7 @@ To run the API locally:
 3. Set `DATABASE_URL` using the format in `backend/.env.example`.
 4. Start the API from the `backend` directory with
    `uvicorn app.main:app --reload`.
-5. Open `/docs` on the local server to try `POST /api/v1/papers`.
+5. Open `/docs` on the local server to try the paper-ingestion and catalog APIs.
 
 Install `backend/requirements-dev.txt` and run `pytest` from the `backend`
-directory to execute the ingestion tests using an in-memory SQLite database.
+directory to execute the tests using an in-memory SQLite database.
