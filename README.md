@@ -69,6 +69,14 @@ Deletes follow the foreign-key behavior in `exam_pattern_ddl.sql`, so deleting
 a subject, semester, unit, or topic can cascade to related historical records.
 A question type cannot be deleted while questions use it.
 
+### Fourth module: database access
+
+The database layer owns SQLAlchemy engine and session creation. Set
+`DATABASE_URL` to choose the database; SQLite connections enforce the schema's
+foreign-key and cascade rules just like PostgreSQL. The API does not create the
+schema automatically: apply `exam_pattern_ddl.sql` to PostgreSQL before
+starting the application.
+
 To run the API locally:
 
 1. Create a PostgreSQL database named `exam_pattern` and run
