@@ -231,6 +231,35 @@ button:hover {
   background: #fafcff;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.semantic-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.questions-list.compact .question-card {
+  padding: 12px 14px;
+}
+
+.similarity-score {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary-strong);
+  background: #edf4ff;
+  border-radius: 999px;
+  padding: 5px 10px;
+}
+
 @media (max-width: 980px) {
   .layout {
     grid-template-columns: 1fr;

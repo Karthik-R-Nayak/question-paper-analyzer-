@@ -19,7 +19,10 @@ const els = {
   questionsList: document.getElementById('questionsList'),
   questionTypesChart: document.getElementById('questionTypesChart'),
   topicsChart: document.getElementById('topicsChart'),
-  semesterComparison: document.getElementById('semesterComparison')
+  semesterComparison: document.getElementById('semesterComparison'),
+  semanticQueryInput: document.getElementById('semanticQueryInput'),
+  semanticSearchBtn: document.getElementById('semanticSearchBtn'),
+  similarQuestionsList: document.getElementById('similarQuestionsList')
 };
 
 async function apiFetch(url) {
@@ -160,6 +163,43 @@ function renderQuestions(items) {
     .join('');
 }
 
+function renderSimilarQuestions(items) {
+  if (!items.length) {
+    els.similarQuestionsList.innerHTML = '<div class="empty-state">No similar questions found.</div>';
+    return;
+  }
+
+  els.similarQuestionsList.innerHTML = items
+    .map(
+      (item) => `
+        <article class="question-card">
+          <h3>${item.question_text}</h3>
+          <div class="meta">
+            <span>Question #${item.question_id}</span>
+          </div>
+          <span class="similarity-score">Similarity: ${item.similarity_score}</span>
+        </article>
+      `
+    )
+    .join('');
+}
+
+async function searchSimilarQuestions() {
+  const query = (els.semanticQueryInput.value || '').trim();
+  if (!query) {
+    els.similarQuestionsList.innerHTML = '<div class="empty-state">Enter a question or concept to find similar items.</div>';
+    return;
+  }
+
+  try {
+    const items = await apiFetch(`/api/v1/semantic/similar?q=${encodeURIComponent(query)}&limit=5`);
+    renderSimilarQuestions(items);
+  } catch (error) {
+    console.error(error);
+    els.similarQuestionsList.innerHTML = '<div class="empty-state">Unable to load semantic matches.</div>';
+  }
+}
+
 async function fetchCatalogData() {
   const [subjects, semesters] = await Promise.all([
     apiFetch('/api/v1/catalog/subjects'),
@@ -225,9 +265,20 @@ els.applyFilters.addEventListener('click', () => {
   refreshData();
 });
 
+els.semanticSearchBtn.addEventListener('click', searchSimilarQuestions);
+els.semanticQueryInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    searchSimilarQuestions();
+  }
+});
+
 async function init() {
   await fetchCatalogData();
   await refreshData();
+  if (els.semanticQueryInput.value.trim() === '') {
+    els.semanticQueryInput.value = 'Explain database normalization';
+    await searchSimilarQuestions();
+  }
 }
 
 init();
