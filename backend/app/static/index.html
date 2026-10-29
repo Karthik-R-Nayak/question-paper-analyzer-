@@ -17,6 +17,7 @@
           <button class="tab-button active" data-tab="overview" type="button">Overview</button>
           <button class="tab-button" data-tab="search" type="button">Question Search</button>
           <button class="tab-button" data-tab="similarity" type="button">Semantic Similarity</button>
+          <button class="tab-button" data-tab="paper" type="button">Paper Ingestion</button>
         </nav>
       </header>
 
@@ -97,6 +98,59 @@
                 <button id="semanticSearchBtn" type="button">Find similar</button>
               </div>
               <div id="similarQuestionsList" class="questions-list compact"></div>
+            </div>
+          </section>
+
+          <section id="paper-panel" class="tab-panel">
+            <div class="panel paper-form-panel">
+              <div class="section-header">
+                <h2>Paper ingestion</h2>
+              </div>
+
+              <div class="paper-form-grid">
+                <label>
+                  Subject
+                  <select id="paperSubject">
+                    <option value="">Choose subject</option>
+                  </select>
+                </label>
+
+                <label>
+                  Semester
+                  <select id="paperSemester">
+                    <option value="">Choose semester</option>
+                  </select>
+                </label>
+
+                <label>
+                  Exam type
+                  <select id="paperExamType">
+                    <option value="Internal">Internal</option>
+                    <option value="Mid">Mid</option>
+                    <option value="End" selected>End</option>
+                    <option value="Supplementary">Supplementary</option>
+                  </select>
+                </label>
+
+                <label>
+                  Total marks
+                  <input id="paperTotalMarks" type="number" min="1" placeholder="Enter total marks" />
+                </label>
+              </div>
+
+              <div class="paper-questions-block">
+                <div class="section-header compact-header">
+                  <h3>Questions</h3>
+                  <button id="addQuestionBtn" class="secondary-btn" type="button">Add question</button>
+                </div>
+                <div id="paperQuestionRows" class="paper-question-rows"></div>
+              </div>
+
+              <div class="paper-form-actions">
+                <button id="submitPaperBtn" type="button">Create paper</button>
+              </div>
+
+              <div id="paperStatus" class="status-message"></div>
             </div>
           </section>
         </section>

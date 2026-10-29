@@ -301,9 +301,78 @@ button:hover {
   display: block;
 }
 
-.content {
+.paper-form-panel {
   display: grid;
-  gap: 24px;
+  gap: 20px;
+}
+
+.paper-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.paper-question-row {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fafcff;
+}
+
+.paper-row-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.paper-question-rows {
+  display: grid;
+  gap: 16px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  margin-top: 8px;
+}
+
+.secondary-btn {
+  background: #edf3ff;
+  color: var(--primary-strong);
+  border: 1px solid var(--border);
+}
+
+.compact-header {
+  margin-bottom: 0;
+}
+
+.paper-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.status-message {
+  min-height: 20px;
+  font-weight: 600;
+}
+
+.status-message.success {
+  color: var(--success);
+}
+
+.status-message.error {
+  color: #d12c4f;
+}
+
+select[multiple] {
+  min-height: 120px;
 }
 
 @media (max-width: 980px) {
@@ -314,6 +383,17 @@ button:hover {
   .stats-grid,
   .analytics-grid {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .paper-form-grid,
+  .paper-row-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    align-items: flex-start;
   }
 }
 

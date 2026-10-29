@@ -1,12 +1,23 @@
 const state = {
   subjects: [],
   semesters: [],
+  questionTypes: [],
+  topics: [],
   filters: {
     q: '',
     subject_id: '',
     semester_id: '',
     exam_type: ''
-  }
+  },
+  paperRows: [
+    {
+      question_number: '1',
+      marks: 10,
+      question_text: '',
+      question_type_id: '',
+      topic_ids: []
+    }
+  ]
 };
 
 const els = {
@@ -24,13 +35,36 @@ const els = {
   semanticSearchBtn: document.getElementById('semanticSearchBtn'),
   similarQuestionsList: document.getElementById('similarQuestionsList'),
   tabButtons: document.querySelectorAll('.tab-button'),
-  tabPanels: document.querySelectorAll('.tab-panel')
+  tabPanels: document.querySelectorAll('.tab-panel'),
+  paperSubject: document.getElementById('paperSubject'),
+  paperSemester: document.getElementById('paperSemester'),
+  paperExamType: document.getElementById('paperExamType'),
+  paperTotalMarks: document.getElementById('paperTotalMarks'),
+  paperQuestionRows: document.getElementById('paperQuestionRows'),
+  addQuestionBtn: document.getElementById('addQuestionBtn'),
+  submitPaperBtn: document.getElementById('submitPaperBtn'),
+  paperStatus: document.getElementById('paperStatus')
 };
 
-async function apiFetch(url) {
-  const response = await fetch(url);
+function setActiveTab(tabName) {
+  els.tabButtons.forEach((button) => {
+    button.classList.toggle('active', button.dataset.tab === tabName);
+  });
+
+  els.tabPanels.forEach((panel) => {
+    panel.classList.toggle('active', panel.id === `${tabName}-panel`);
+  });
+}
+
+els.tabButtons.forEach((button) => {
+  button.addEventListener('click', () => setActiveTab(button.dataset.tab));
+});
+
+async function apiFetch(url, options = {}) {
+  const response = await fetch(url, options);
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    const text = await response.text();
+    throw new Error(text || `Request failed: ${response.status}`);
   }
   return response.json();
 }
@@ -186,6 +220,64 @@ function renderSimilarQuestions(items) {
     .join('');
 }
 
+function renderPaperQuestionRows() {
+  if (!state.paperRows.length) {
+    state.paperRows = [{ question_number: '1', marks: 10, question_text: '', question_type_id: '', topic_ids: [] }];
+  }
+
+  els.paperQuestionRows.innerHTML = state.paperRows
+    .map(
+      (row, index) => `
+        <div class="paper-question-row">
+          <div class="paper-row-grid">
+            <label>
+              Question no.
+              <input class="paper-question-number" data-index="${index}" type="text" value="${row.question_number}" />
+            </label>
+            <label>
+              Marks
+              <input class="paper-question-marks" data-index="${index}" type="number" min="1" value="${row.marks}" />
+            </label>
+            <label>
+              Type
+              <select class="paper-question-type" data-index="${index}">
+                <option value="">Select type</option>
+                ${state.questionTypes
+                  .map(
+                    (type) =>
+                      `<option value="${type.type_id}" ${String(type.type_id) === String(row.question_type_id) ? 'selected' : ''}>${type.type_name}</option>`
+                  )
+                  .join('')}
+              </select>
+            </label>
+          </div>
+          <label>
+            Question text
+            <textarea class="paper-question-text" data-index="${index}" rows="3" placeholder="Type the question text...">${row.question_text}</textarea>
+          </label>
+          <label>
+            Topic(s)
+            <select class="paper-question-topics" data-index="${index}" multiple size="5">
+              ${state.topics
+                .map(
+                  (topic) =>
+                    `<option value="${topic.topic_id}" ${row.topic_ids.includes(topic.topic_id) ? 'selected' : ''}>${topic.topic_name}</option>`
+                )
+                .join('')}
+            </select>
+          </label>
+          <button type="button" class="remove-question" data-index="${index}">Remove question</button>
+        </div>
+      `
+    )
+    .join('');
+}
+
+function showPaperStatus(message, isError = false) {
+  els.paperStatus.textContent = message;
+  els.paperStatus.className = `status-message ${isError ? 'error' : 'success'}`;
+}
+
 async function searchSimilarQuestions() {
   const query = (els.semanticQueryInput.value || '').trim();
   if (!query) {
@@ -203,19 +295,31 @@ async function searchSimilarQuestions() {
 }
 
 async function fetchCatalogData() {
-  const [subjects, semesters] = await Promise.all([
+  const [subjects, semesters, questionTypes, topics] = await Promise.all([
     apiFetch('/api/v1/catalog/subjects'),
-    apiFetch('/api/v1/catalog/semesters')
+    apiFetch('/api/v1/catalog/semesters'),
+    apiFetch('/api/v1/catalog/question-types'),
+    apiFetch('/api/v1/catalog/topics')
   ]);
 
   state.subjects = subjects;
   state.semesters = semesters;
+  state.questionTypes = questionTypes;
+  state.topics = topics;
 
   els.subjectFilter.innerHTML = '<option value="">All subjects</option>' +
     subjects.map((s) => `<option value="${s.subject_id}">${s.subject_name}</option>`).join('');
 
   els.semesterFilter.innerHTML = '<option value="">All semesters</option>' +
     semesters.map((s) => `<option value="${s.semester_id}">Sem ${s.semester_number} (${s.academic_year})</option>`).join('');
+
+  els.paperSubject.innerHTML = '<option value="">Choose subject</option>' +
+    subjects.map((s) => `<option value="${s.subject_id}">${s.subject_name}</option>`).join('');
+
+  els.paperSemester.innerHTML = '<option value="">Choose semester</option>' +
+    semesters.map((s) => `<option value="${s.semester_id}">Sem ${s.semester_number} (${s.academic_year})</option>`).join('');
+
+  renderPaperQuestionRows();
 }
 
 async function loadOverview() {
@@ -259,19 +363,66 @@ async function refreshData() {
   }
 }
 
-function setActiveTab(tabName) {
-  els.tabButtons.forEach((button) => {
-    button.classList.toggle('active', button.dataset.tab === tabName);
+function createPaperPayload() {
+  const subjectId = Number(els.paperSubject.value);
+  const semesterId = Number(els.paperSemester.value);
+  const examType = els.paperExamType.value;
+  const totalMarks = Number(els.paperTotalMarks.value);
+
+  const questions = Array.from(document.querySelectorAll('.paper-question-row')).map((row) => {
+    const questionNumber = row.querySelector('.paper-question-number').value.trim();
+    const marks = Number(row.querySelector('.paper-question-marks').value);
+    const questionText = row.querySelector('.paper-question-text').value.trim();
+    const typeId = Number(row.querySelector('.paper-question-type').value);
+    const topicIds = Array.from(row.querySelectorAll('.paper-question-topics option:checked')).map((option) => Number(option.value));
+
+    return {
+      question_number: questionNumber,
+      marks,
+      question_text: questionText,
+      question_type_id: typeId,
+      topic_ids: topicIds
+    };
   });
 
-  els.tabPanels.forEach((panel) => {
-    panel.classList.toggle('active', panel.id === `${tabName}-panel`);
-  });
+  return {
+    subject_id: subjectId,
+    semester_id: semesterId,
+    exam_type: examType,
+    total_marks: totalMarks,
+    questions
+  };
 }
 
-els.tabButtons.forEach((button) => {
-  button.addEventListener('click', () => setActiveTab(button.dataset.tab));
-});
+async function submitPaper() {
+  const payload = createPaperPayload();
+
+  const requiredQuestions = payload.questions.filter((question) => question.question_text && question.question_type_id);
+  if (!payload.subject_id || !payload.semester_id || !payload.exam_type || !payload.total_marks || !requiredQuestions.length) {
+    showPaperStatus('Please fill in the subject, semester, exam type, total marks, and at least one valid question.', true);
+    return;
+  }
+
+  try {
+    const createdPaper = await apiFetch('/api/v1/papers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    showPaperStatus(`Paper created successfully with ID ${createdPaper.paper_id}.`);
+    state.paperRows = [{ question_number: '1', marks: 10, question_text: '', question_type_id: '', topic_ids: [] }];
+    renderPaperQuestionRows();
+    els.paperSubject.value = '';
+    els.paperSemester.value = '';
+    els.paperExamType.value = 'End';
+    els.paperTotalMarks.value = '';
+    await refreshData();
+  } catch (error) {
+    console.error(error);
+    showPaperStatus(error.message || 'Failed to create paper.', true);
+  }
+}
 
 els.applyFilters.addEventListener('click', () => {
   state.filters.q = els.searchInput.value.trim();
@@ -288,6 +439,32 @@ els.semanticQueryInput.addEventListener('keydown', (event) => {
   }
 });
 
+els.addQuestionBtn.addEventListener('click', () => {
+  const nextNumber = state.paperRows.length + 1;
+  state.paperRows.push({ question_number: String(nextNumber), marks: 10, question_text: '', question_type_id: '', topic_ids: [] });
+  renderPaperQuestionRows();
+});
+
+els.paperQuestionRows.addEventListener('click', (event) => {
+  const button = event.target.closest('.remove-question');
+  if (!button) {
+    return;
+  }
+
+  const index = Number(button.dataset.index);
+  if (state.paperRows.length === 1) {
+    state.paperRows = [{ question_number: '1', marks: 10, question_text: '', question_type_id: '', topic_ids: [] }];
+    renderPaperQuestionRows();
+    return;
+  }
+
+  state.paperRows.splice(index, 1);
+  state.paperRows = state.paperRows.map((row, rowIndex) => ({ ...row, question_number: String(rowIndex + 1) }));
+  renderPaperQuestionRows();
+});
+
+els.submitPaperBtn.addEventListener('click', submitPaper);
+
 async function init() {
   await fetchCatalogData();
   await refreshData();
@@ -295,6 +472,7 @@ async function init() {
     els.semanticQueryInput.value = 'Explain database normalization';
     await searchSimilarQuestions();
   }
+  setActiveTab('overview');
 }
 
 init();
