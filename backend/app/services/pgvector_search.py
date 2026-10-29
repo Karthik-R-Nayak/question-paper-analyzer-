@@ -7,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import get_database_engine
+from app.models import Question
 
 try:
     from pgvector.sqlalchemy import Vector
