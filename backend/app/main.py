@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.routers.analytics import router as analytics_router
 from app.routers.catalog import router as catalog_router
 from app.routers.papers import router as papers_router
+from app.routers.semantic import router as semantic_router
 
 app = FastAPI(
     title="Historical Examination Pattern Analysis API",
@@ -24,3 +25,4 @@ def read_root() -> FileResponse:
 app.include_router(catalog_router)
 app.include_router(papers_router)
 app.include_router(analytics_router)
+app.include_router(semantic_router)
