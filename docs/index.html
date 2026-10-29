@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Question Paper Analyzer</title>
+    <meta
+      name="description"
+      content="Historical Examination Pattern Analysis System for DBMS project. Search question papers, analyze patterns, and compare trends."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <nav class="topbar container">
+        <div class="brand">QPA</div>
+        <div class="nav-links">
+          <a href="#overview">Overview</a>
+          <a href="#features">Features</a>
+          <a href="#api">API</a>
+          <a href="#run">Run locally</a>
+        </div>
+      </nav>
+
+      <div class="container hero-inner">
+        <div class="hero-copy">
+          <p class="eyebrow">DBMS Project</p>
+          <h1>Historical Examination Pattern Analysis System</h1>
+          <p class="lead">
+            Analyze previous question papers to identify unit weightage, recurring topics,
+            question-type trends, and semantically similar questions across semesters.
+          </p>
+          <div class="cta-row">
+            <a class="button primary" href="#features">Explore features</a>
+            <a class="button secondary" href="#run">Run locally</a>
+          </div>
+        </div>
+
+        <div class="hero-card">
+          <h2>Project summary</h2>
+          <ul>
+            <li>Relational DB for paper and syllabus metadata</li>
+            <li>Vector-based semantic question search</li>
+            <li>Semester and subject pattern analytics</li>
+            <li>FastAPI backend with dashboard UI</li>
+          </ul>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="overview" class="container section">
+        <div class="section-heading">
+          <p class="eyebrow">Overview</p>
+          <h2>Study past exams with evidence, not guesswork.</h2>
+        </div>
+        <p class="text-block">
+          The Question Paper Analyzer helps students and faculty review historical exam data,
+          detect frequently repeated topics, and compare exam patterns across academic years.
+          It stores papers, questions, marks, units, and topics in a structured database and
+          supports semantic similarity matching for different wording of the same concept.
+        </p>
+      </section>
+
+      <section id="features" class="container section alt">
+        <div class="section-heading">
+          <p class="eyebrow">Features</p>
+          <h2>What the system can do</h2>
+        </div>
+
+        <div class="feature-grid">
+          <article class="card">
+            <h3>Paper ingestion</h3>
+            <p>Create exam papers, assign subjects and semesters, and store question-level data.</p>
+          </article>
+
+          <article class="card">
+            <h3>Academic catalog</h3>
+            <p>Manage subjects, units, topics, semesters, and question types from a central catalog.</p>
+          </article>
+
+          <article class="card">
+            <h3>Pattern analytics</h3>
+            <p>Measure topic frequency, unit weightage, question-type distribution, and semester trends.</p>
+          </article>
+
+          <article class="card">
+            <h3>Semantic search</h3>
+            <p>Find conceptually similar questions even when wording differs across papers.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="api" class="container section">
+        <div class="section-heading">
+          <p class="eyebrow">API</p>
+          <h2>Core endpoints</h2>
+        </div>
+
+        <div class="code-block">
+          <pre>GET /api/v1/search/questions
+GET /api/v1/analytics/overview
+GET /api/v1/analytics/compare
+GET /api/v1/analytics/patterns
+GET /api/v1/semantic/similar
+POST /api/v1/papers</pre>
+        </div>
+      </section>
+
+      <section id="run" class="container section alt">
+        <div class="section-heading">
+          <p class="eyebrow">Run locally</p>
+          <h2>Local development steps</h2>
+        </div>
+
+        <ol class="steps">
+          <li>Open the backend folder.</li>
+          <li>Create or configure PostgreSQL and run the SQL schema in <code>exam_pattern_ddl.sql</code>.</li>
+          <li>Install dependencies.</li>
+          <li>Set <code>DATABASE_URL</code>.</li>
+          <li>Run: <code>uvicorn app.main:app --reload</code></li>
+          <li>Open the app at <code>http://127.0.0.1:8000</code></li>
+        </ol>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-inner">
+        <span>Question Paper Analyzer</span>
+        <span>DBMS Project</span>
+      </div>
+    </footer>
+  </body>
+</html>
