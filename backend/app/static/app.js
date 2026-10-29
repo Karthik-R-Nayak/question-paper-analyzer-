@@ -22,7 +22,9 @@ const els = {
   semesterComparison: document.getElementById('semesterComparison'),
   semanticQueryInput: document.getElementById('semanticQueryInput'),
   semanticSearchBtn: document.getElementById('semanticSearchBtn'),
-  similarQuestionsList: document.getElementById('similarQuestionsList')
+  similarQuestionsList: document.getElementById('similarQuestionsList'),
+  tabButtons: document.querySelectorAll('.tab-button'),
+  tabPanels: document.querySelectorAll('.tab-panel')
 };
 
 async function apiFetch(url) {
@@ -256,6 +258,20 @@ async function refreshData() {
     setLoadingState('Unable to load data from the API.');
   }
 }
+
+function setActiveTab(tabName) {
+  els.tabButtons.forEach((button) => {
+    button.classList.toggle('active', button.dataset.tab === tabName);
+  });
+
+  els.tabPanels.forEach((panel) => {
+    panel.classList.toggle('active', panel.id === `${tabName}-panel`);
+  });
+}
+
+els.tabButtons.forEach((button) => {
+  button.addEventListener('click', () => setActiveTab(button.dataset.tab));
+});
 
 els.applyFilters.addEventListener('click', () => {
   state.filters.q = els.searchInput.value.trim();

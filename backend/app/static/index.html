@@ -13,6 +13,11 @@
           <p class="eyebrow">DBMS Project</p>
           <h1>Historical Examination Pattern Analysis</h1>
         </div>
+        <nav class="dashboard-tabs" aria-label="Dashboard sections">
+          <button class="tab-button active" data-tab="overview" type="button">Overview</button>
+          <button class="tab-button" data-tab="search" type="button">Question Search</button>
+          <button class="tab-button" data-tab="similarity" type="button">Semantic Similarity</button>
+        </nav>
       </header>
 
       <main class="layout">
@@ -52,42 +57,48 @@
         </aside>
 
         <section class="content">
-          <div class="stats-grid" id="statsGrid"></div>
+          <section id="overview-panel" class="tab-panel active">
+            <div class="stats-grid" id="statsGrid"></div>
 
-          <div class="panel">
-            <div class="section-header">
-              <h2>Question search</h2>
-            </div>
-            <div id="questionsList" class="questions-list"></div>
-          </div>
+            <div class="analytics-grid">
+              <div class="panel">
+                <h2>Question types</h2>
+                <div id="questionTypesChart" class="chart-list"></div>
+              </div>
 
-          <div class="panel">
-            <div class="section-header">
-              <h2>Semantic similar questions</h2>
-            </div>
-            <div class="semantic-search-row">
-              <input id="semanticQueryInput" type="text" placeholder="Try: Explain database normalization" />
-              <button id="semanticSearchBtn" type="button">Find similar</button>
-            </div>
-            <div id="similarQuestionsList" class="questions-list compact"></div>
-          </div>
+              <div class="panel">
+                <h2>Topic frequency</h2>
+                <div id="topicsChart" class="chart-list"></div>
+              </div>
 
-          <div class="analytics-grid">
+              <div class="panel span-2">
+                <h2>Semester comparison</h2>
+                <div id="semesterComparison" class="table-wrapper"></div>
+              </div>
+            </div>
+          </section>
+
+          <section id="search-panel" class="tab-panel">
             <div class="panel">
-              <h2>Question types</h2>
-              <div id="questionTypesChart" class="chart-list"></div>
+              <div class="section-header">
+                <h2>Question search</h2>
+              </div>
+              <div id="questionsList" class="questions-list"></div>
             </div>
+          </section>
 
+          <section id="similarity-panel" class="tab-panel">
             <div class="panel">
-              <h2>Topic frequency</h2>
-              <div id="topicsChart" class="chart-list"></div>
+              <div class="section-header">
+                <h2>Semantic similar questions</h2>
+              </div>
+              <div class="semantic-search-row">
+                <input id="semanticQueryInput" type="text" placeholder="Try: Explain database normalization" />
+                <button id="semanticSearchBtn" type="button">Find similar</button>
+              </div>
+              <div id="similarQuestionsList" class="questions-list compact"></div>
             </div>
-
-            <div class="panel span-2">
-              <h2>Semester comparison</h2>
-              <div id="semesterComparison" class="table-wrapper"></div>
-            </div>
-          </div>
+          </section>
         </section>
       </main>
     </div>
