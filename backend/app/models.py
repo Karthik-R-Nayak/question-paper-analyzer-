@@ -1,9 +1,27 @@
 from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+try:
+    from pgvector.sqlalchemy import Vector
+except Exception:  # pragma: no cover - optional dependency on PostgreSQL only
+    Vector = None
+
 
 class Base(DeclarativeBase):
     pass
+
+
+class QuestionEmbedding(Base):
+    __tablename__ = "question_embedding"
+
+    question_id: Mapped[int] = mapped_column(
+        ForeignKey("question.question_id", ondelete="CASCADE", onupdate="CASCADE"),
+        primary_key=True,
+    )
+    embedding = mapped_column(
+        Vector(384) if Vector is not None else Text,
+        nullable=False,
+    )
 
 
 class Subject(Base):
