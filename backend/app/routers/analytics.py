@@ -30,6 +30,26 @@ def _apply_filters(stmt, *, subject_id=None, semester_id=None, exam_type=None):
     return stmt
 
 
+def _filtered_paper_questions(*, subject_id=None, semester_id=None, exam_type=None):
+    stmt = (
+        select(
+            PaperQuestion.paper_id,
+            PaperQuestion.question_id,
+            PaperQuestion.marks,
+            ExamPaper.subject_id,
+            ExamPaper.semester_id,
+            ExamPaper.exam_type,
+        )
+        .join(ExamPaper, ExamPaper.paper_id == PaperQuestion.paper_id)
+    )
+    return _apply_filters(
+        stmt,
+        subject_id=subject_id,
+        semester_id=semester_id,
+        exam_type=exam_type,
+    ).subquery()
+
+
 @router.get("/search/questions")
 def search_questions(
     q: str = Query(default="", description="Keyword to search in the question text."),
@@ -118,70 +138,51 @@ def analytics_overview(
     exam_type: str | None = None,
     session: Session = Depends(get_session),
 ):
-    paper_stmt = select(func.count(ExamPaper.paper_id))
-    question_stmt = (
-        select(func.count(Question.question_id))
-        .join(PaperQuestion, PaperQuestion.question_id == Question.question_id)
-        .join(ExamPaper, ExamPaper.paper_id == PaperQuestion.paper_id)
+    question_scope = _filtered_paper_questions(
+        subject_id=subject_id,
+        semester_id=semester_id,
+        exam_type=exam_type,
     )
+    paper_stmt = select(func.count(ExamPaper.paper_id))
+    question_stmt = select(func.count(question_scope.c.question_id))
 
     if subject_id is not None:
         paper_stmt = paper_stmt.where(ExamPaper.subject_id == subject_id)
-        question_stmt = question_stmt.where(ExamPaper.subject_id == subject_id)
     if semester_id is not None:
         paper_stmt = paper_stmt.where(ExamPaper.semester_id == semester_id)
-        question_stmt = question_stmt.where(ExamPaper.semester_id == semester_id)
     if exam_type:
         paper_stmt = paper_stmt.where(ExamPaper.exam_type == exam_type)
-        question_stmt = question_stmt.where(ExamPaper.exam_type == exam_type)
 
     question_type_stmt = (
-        select(QuestionType.type_name, func.count(Question.question_id).label("count"))
+        select(QuestionType.type_name, func.count(question_scope.c.question_id).label("count"))
         .join(Question, Question.type_id == QuestionType.type_id)
-        .join(PaperQuestion, PaperQuestion.question_id == Question.question_id)
-        .join(ExamPaper, ExamPaper.paper_id == PaperQuestion.paper_id)
+        .join(question_scope, question_scope.c.question_id == Question.question_id)
         .group_by(QuestionType.type_name)
-        .order_by(func.count(Question.question_id).desc())
+        .order_by(
+            func.count(question_scope.c.question_id).desc(),
+            QuestionType.type_name,
+        )
     )
     topic_stmt = (
-        select(Topic.topic_name, func.count(QuestionTopic.question_id).label("count"))
+        select(Topic.topic_name, func.count(question_scope.c.question_id).label("count"))
         .join(QuestionTopic, QuestionTopic.topic_id == Topic.topic_id)
+        .join(question_scope, question_scope.c.question_id == QuestionTopic.question_id)
         .group_by(Topic.topic_name)
-        .order_by(func.count(QuestionTopic.question_id).desc())
+        .order_by(
+            func.count(question_scope.c.question_id).desc(),
+            Topic.topic_name,
+        )
     )
     semester_stmt = (
         select(
             Semester.semester_number,
             Semester.academic_year,
-            func.count(Question.question_id).label("count"),
+            func.count(question_scope.c.question_id).label("count"),
         )
-        .join(ExamPaper, ExamPaper.semester_id == Semester.semester_id)
-        .join(PaperQuestion, PaperQuestion.paper_id == ExamPaper.paper_id)
-        .join(Question, Question.question_id == PaperQuestion.question_id)
+        .join(question_scope, question_scope.c.semester_id == Semester.semester_id)
         .group_by(Semester.semester_number, Semester.academic_year)
         .order_by(Semester.semester_number)
     )
-
-    if subject_id is not None:
-        question_type_stmt = question_type_stmt.where(ExamPaper.subject_id == subject_id)
-        semester_stmt = semester_stmt.where(ExamPaper.subject_id == subject_id)
-        topic_stmt = (
-            select(Topic.topic_name, func.count(QuestionTopic.question_id).label("count"))
-            .join(QuestionTopic, QuestionTopic.topic_id == Topic.topic_id)
-            .join(Question, Question.question_id == QuestionTopic.question_id)
-            .join(PaperQuestion, PaperQuestion.question_id == Question.question_id)
-            .join(ExamPaper, ExamPaper.paper_id == PaperQuestion.paper_id)
-            .where(ExamPaper.subject_id == subject_id)
-            .group_by(Topic.topic_name)
-            .order_by(func.count(QuestionTopic.question_id).desc())
-        )
-    if semester_id is not None:
-        question_type_stmt = question_type_stmt.where(ExamPaper.semester_id == semester_id)
-        semester_stmt = semester_stmt.where(ExamPaper.semester_id == semester_id)
-    if exam_type:
-        question_type_stmt = question_type_stmt.where(ExamPaper.exam_type == exam_type)
-        topic_stmt = _apply_filters(topic_stmt, subject_id=subject_id, semester_id=semester_id, exam_type=exam_type)
-        semester_stmt = semester_stmt.where(ExamPaper.exam_type == exam_type)
 
     return {
         "totals": {
@@ -252,12 +253,11 @@ def pattern_analytics(
     exam_type: str | None = None,
     session: Session = Depends(get_session),
 ):
-    question_scope = (
-        select(PaperQuestion.question_id, PaperQuestion.marks, ExamPaper.subject_id, ExamPaper.semester_id, ExamPaper.exam_type)
-        .join(ExamPaper, ExamPaper.paper_id == PaperQuestion.paper_id)
+    question_scope = _filtered_paper_questions(
+        subject_id=subject_id,
+        semester_id=semester_id,
+        exam_type=exam_type,
     )
-    question_scope = _apply_filters(question_scope, subject_id=subject_id, semester_id=semester_id, exam_type=exam_type)
-    question_scope = question_scope.subquery()
 
     unit_weightage_stmt = (
         select(
@@ -270,49 +270,56 @@ def pattern_analytics(
         .join(Unit, Unit.unit_id == Topic.unit_id)
         .join(Subject, Subject.subject_id == Unit.subject_id)
         .group_by(Subject.subject_name, Unit.unit_name)
-        .order_by(func.sum(question_scope.c.marks).desc())
+        .order_by(func.sum(question_scope.c.marks).desc(), Unit.unit_name)
     )
 
     topic_frequency_stmt = (
         select(
             Subject.subject_name,
             Topic.topic_name,
-            func.count(QuestionTopic.question_id).label("frequency"),
+            func.count(question_scope.c.question_id).label("frequency"),
             func.sum(question_scope.c.marks).label("total_marks"),
-            func.count(func.distinct(ExamPaper.paper_id)).label("paper_count"),
+            func.count(func.distinct(question_scope.c.paper_id)).label("paper_count"),
         )
         .join(QuestionTopic, QuestionTopic.question_id == question_scope.c.question_id)
         .join(Topic, Topic.topic_id == QuestionTopic.topic_id)
         .join(Unit, Unit.unit_id == Topic.unit_id)
         .join(Subject, Subject.subject_id == Unit.subject_id)
-        .join(ExamPaper, ExamPaper.paper_id == PaperQuestion.paper_id)
-        .join(PaperQuestion, PaperQuestion.question_id == QuestionTopic.question_id)
         .group_by(Subject.subject_name, Topic.topic_name)
-        .order_by(func.count(QuestionTopic.question_id).desc())
+        .order_by(
+            func.count(question_scope.c.question_id).desc(),
+            Topic.topic_name,
+        )
     )
 
     question_type_stmt = (
         select(
             QuestionType.type_name,
-            func.count(Question.question_id).label("count"),
+            func.count(question_scope.c.question_id).label("count"),
             func.sum(question_scope.c.marks).label("total_marks"),
         )
         .join(Question, Question.type_id == QuestionType.type_id)
         .join(question_scope, question_scope.c.question_id == Question.question_id)
         .group_by(QuestionType.type_name)
-        .order_by(func.count(Question.question_id).desc())
+        .order_by(
+            func.count(question_scope.c.question_id).desc(),
+            QuestionType.type_name,
+        )
     )
 
     recurring_concepts_stmt = (
         select(
             Topic.topic_name,
-            func.count(QuestionTopic.question_id).label("frequency"),
+            func.count(question_scope.c.question_id).label("frequency"),
             func.sum(question_scope.c.marks).label("total_marks"),
         )
         .join(QuestionTopic, QuestionTopic.topic_id == Topic.topic_id)
         .join(question_scope, question_scope.c.question_id == QuestionTopic.question_id)
         .group_by(Topic.topic_name)
-        .order_by(func.count(QuestionTopic.question_id).desc())
+        .order_by(
+            func.count(question_scope.c.question_id).desc(),
+            Topic.topic_name,
+        )
     )
 
     semester_trend_stmt = (
@@ -320,35 +327,19 @@ def pattern_analytics(
             Subject.subject_name,
             Semester.semester_number,
             Semester.academic_year,
-            func.count(Question.question_id).label("question_count"),
-            func.sum(PaperQuestion.marks).label("total_marks"),
+            func.count(question_scope.c.question_id).label("question_count"),
+            func.sum(question_scope.c.marks).label("total_marks"),
         )
-        .join(ExamPaper, ExamPaper.subject_id == Subject.subject_id)
-        .join(Semester, Semester.semester_id == ExamPaper.semester_id)
-        .join(PaperQuestion, PaperQuestion.paper_id == ExamPaper.paper_id)
-        .join(Question, Question.question_id == PaperQuestion.question_id)
+        .join(question_scope, question_scope.c.subject_id == Subject.subject_id)
+        .join(Semester, Semester.semester_id == question_scope.c.semester_id)
         .group_by(Subject.subject_name, Semester.semester_number, Semester.academic_year)
-        .order_by(Semester.semester_number)
+        .order_by(Semester.semester_number, Semester.academic_year)
     )
 
     if subject_id is not None:
         unit_weightage_stmt = unit_weightage_stmt.where(Subject.subject_id == subject_id)
         topic_frequency_stmt = topic_frequency_stmt.where(Subject.subject_id == subject_id)
-        question_type_stmt = question_type_stmt.where(question_scope.c.subject_id == subject_id)
-        recurring_concepts_stmt = recurring_concepts_stmt.join(Unit, Unit.unit_id == Topic.unit_id).join(Subject, Subject.subject_id == Unit.subject_id).where(Subject.subject_id == subject_id)
         semester_trend_stmt = semester_trend_stmt.where(Subject.subject_id == subject_id)
-    if semester_id is not None:
-        unit_weightage_stmt = unit_weightage_stmt.where(question_scope.c.semester_id == semester_id)
-        topic_frequency_stmt = topic_frequency_stmt.where(question_scope.c.semester_id == semester_id)
-        question_type_stmt = question_type_stmt.where(question_scope.c.semester_id == semester_id)
-        recurring_concepts_stmt = recurring_concepts_stmt.where(question_scope.c.semester_id == semester_id)
-        semester_trend_stmt = semester_trend_stmt.where(Semester.semester_id == semester_id)
-    if exam_type:
-        unit_weightage_stmt = unit_weightage_stmt.where(question_scope.c.exam_type == exam_type)
-        topic_frequency_stmt = topic_frequency_stmt.where(question_scope.c.exam_type == exam_type)
-        question_type_stmt = question_type_stmt.where(question_scope.c.exam_type == exam_type)
-        recurring_concepts_stmt = recurring_concepts_stmt.where(question_scope.c.exam_type == exam_type)
-        semester_trend_stmt = semester_trend_stmt.where(ExamPaper.exam_type == exam_type)
 
     total_marks_for_units = session.execute(unit_weightage_stmt).all()
     topic_rows = session.execute(topic_frequency_stmt).all()
