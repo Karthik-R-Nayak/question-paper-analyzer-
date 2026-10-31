@@ -69,6 +69,18 @@ Deletes follow the foreign-key behavior in `exam_pattern_ddl.sql`, so deleting
 a subject, semester, unit, or topic can cascade to related historical records.
 A question type cannot be deleted while questions use it.
 
+### Third module: question and paper management
+
+The paper API under `/api/v1/papers` supports listing and retrieving papers,
+replacing a paper and its complete question list with `PUT`, and deleting a
+paper. Questions can also be added, replaced, and removed individually through
+`/{paper_id}/questions`. Missing papers or paper-question associations return
+`404`; duplicate question numbers within a paper return `409`. Question topic
+mappings are validated against the paper's subject. Updating a question updates
+the question record itself, so changes are visible anywhere that question is
+referenced; removing a paper-question association preserves the question if
+another paper still references it.
+
 ### Fourth module: database access
 
 The database layer owns SQLAlchemy engine and session creation. Set

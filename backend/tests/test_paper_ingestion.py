@@ -103,3 +103,95 @@ def test_rejects_topic_belonging_to_another_subject(client):
     assert response.json()["detail"] == (
         "Topic id(s) do not belong to the paper's subject: 2"
     )
+
+
+def test_lists_and_gets_papers_with_questions(client):
+    created = client.post("/api/v1/papers", json=sample_payload()).json()
+
+    listed = client.get("/api/v1/papers")
+    fetched = client.get(f"/api/v1/papers/{created['paper_id']}")
+
+    assert listed.status_code == 200
+    assert listed.json() == [created]
+    assert fetched.status_code == 200
+    assert fetched.json() == created
+
+
+def test_replaces_paper_and_its_questions(client):
+    created = client.post("/api/v1/papers", json=sample_payload()).json()
+    payload = sample_payload()
+    payload["exam_type"] = "Mid"
+    payload["questions"][0]["question_number"] = "2a"
+    payload["questions"][0]["question_text"] = "Describe relational algebra."
+
+    response = client.put(f"/api/v1/papers/{created['paper_id']}", json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["exam_type"] == "Mid"
+    assert body["questions"][0]["question_number"] == "2a"
+    assert body["questions"][0]["question_text"] == "Describe relational algebra."
+    assert body["questions"][0]["question_id"] != created["questions"][0]["question_id"]
+
+
+def test_adds_updates_and_deletes_a_paper_question(client):
+    paper = client.post("/api/v1/papers", json=sample_payload()).json()
+    new_question = {
+        "question_number": "2",
+        "marks": 5,
+        "question_text": "Define a relation.",
+        "question_type_id": 1,
+        "topic_ids": [1],
+    }
+
+    added = client.post(
+        f"/api/v1/papers/{paper['paper_id']}/questions",
+        json=new_question,
+    )
+    assert added.status_code == 201
+    question_id = added.json()["question_id"]
+
+    updated_question = {**new_question, "marks": 7, "question_text": "Define a table."}
+    updated = client.put(
+        f"/api/v1/papers/{paper['paper_id']}/questions/{question_id}",
+        json=updated_question,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["marks"] == 7
+    assert updated.json()["question_text"] == "Define a table."
+
+    deleted = client.delete(
+        f"/api/v1/papers/{paper['paper_id']}/questions/{question_id}"
+    )
+    assert deleted.status_code == 204
+    assert len(client.get(f"/api/v1/papers/{paper['paper_id']}").json()["questions"]) == 1
+
+
+def test_rejects_duplicate_question_number_when_adding(client):
+    paper = client.post("/api/v1/papers", json=sample_payload()).json()
+    payload = {
+        "question_number": "1a",
+        "marks": 5,
+        "question_text": "Another question.",
+        "question_type_id": 1,
+        "topic_ids": [1],
+    }
+
+    response = client.post(
+        f"/api/v1/papers/{paper['paper_id']}/questions",
+        json=payload,
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Question number already exists in this paper."
+
+
+def test_deletes_paper_and_returns_not_found_afterward(client):
+    created = client.post("/api/v1/papers", json=sample_payload()).json()
+
+    deleted = client.delete(f"/api/v1/papers/{created['paper_id']}")
+    fetched = client.get(f"/api/v1/papers/{created['paper_id']}")
+
+    assert deleted.status_code == 204
+    assert fetched.status_code == 404
+    assert fetched.json()["detail"] == f"Paper not found: {created['paper_id']}"
