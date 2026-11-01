@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_session
+from app.services.pgvector_search import upsert_question_embedding
 from app.models import (
     ExamPaper,
     PaperQuestion,
@@ -90,6 +91,12 @@ def _add_question(
     )
     session.add(question)
     session.flush()
+    upsert_question_embedding(
+        session,
+        question.question_id,
+        question_data.question_text,
+        commit=False,
+    )
     session.add(
         PaperQuestion(
             paper_id=paper_id,
@@ -349,6 +356,12 @@ def update_paper_question(
         link.marks = payload.marks
         question.type_id = payload.question_type_id
         question.question_text = payload.question_text
+        upsert_question_embedding(
+            session,
+            question.question_id,
+            question.question_text,
+            commit=False,
+        )
         session.query(QuestionTopic).filter(
             QuestionTopic.question_id == question_id
         ).delete(synchronize_session=False)

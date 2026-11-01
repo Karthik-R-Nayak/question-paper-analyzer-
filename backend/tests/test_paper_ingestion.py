@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from app.database import get_session
 from app.main import app
 from app.models import Base, QuestionType, Semester, Subject, Topic, Unit
+from app.services import pgvector_search
 
 
 @pytest.fixture
@@ -71,6 +72,47 @@ def test_creates_paper_and_questions(client):
     assert body["paper_id"] == 1
     assert body["questions"][0]["question_number"] == "1a"
     assert body["questions"][0]["topic_ids"] == [1]
+
+
+def test_new_questions_are_immediately_available_to_semantic_search(client, monkeypatch):
+    monkeypatch.setattr(
+        pgvector_search,
+        "model_encode_text",
+        lambda text: [1.0, 0.0] if "relational" in text.lower() else [0.0, 1.0],
+    )
+
+    created = client.post("/api/v1/papers", json=sample_payload())
+    search = client.get(
+        "/api/v1/semantic/similar",
+        params={"q": "Explain the relational model."},
+    )
+
+    assert created.status_code == 201
+    assert search.status_code == 200
+    assert search.json()[0]["question_text"] == "Explain the relational model."
+    assert search.json()[0]["similarity_score"] == 1.0
+
+
+def test_updated_question_embedding_is_refreshed(client, monkeypatch):
+    monkeypatch.setattr(
+        pgvector_search,
+        "model_encode_text",
+        lambda text: [1.0, 0.0] if "relational" in text.lower() else [0.0, 1.0],
+    )
+    created = client.post("/api/v1/papers", json=sample_payload()).json()
+    payload = sample_payload()
+    payload["questions"][0]["question_text"] = "Describe transaction isolation."
+    updated = client.put(f"/api/v1/papers/{created['paper_id']}", json=payload)
+
+    search = client.get(
+        "/api/v1/semantic/similar",
+        params={"q": "Describe transaction isolation."},
+    )
+
+    assert updated.status_code == 200
+    assert search.status_code == 200
+    assert search.json()[0]["question_text"] == "Describe transaction isolation."
+    assert search.json()[0]["similarity_score"] == 1.0
 
 
 def test_rejects_unknown_subject(client):

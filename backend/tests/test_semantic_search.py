@@ -1,3 +1,6 @@
+import sys
+from types import ModuleType
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -7,6 +10,34 @@ from app.database import get_session
 from app.main import app
 from app.models import Base, Question, QuestionType
 from app.services import pgvector_search
+
+
+def test_sentence_transformer_model_is_loaded_once_and_reused(monkeypatch):
+    initialization_count = 0
+
+    class FakeSentenceTransformer:
+        def __init__(self, _model_name):
+            nonlocal initialization_count
+            initialization_count += 1
+
+        def encode(self, text, normalize_embeddings):
+            assert normalize_embeddings is True
+            return [float(len(text)), 1.0]
+
+    module = ModuleType("sentence_transformers")
+    module.SentenceTransformer = FakeSentenceTransformer
+    monkeypatch.setitem(sys.modules, "sentence_transformers", module)
+    pgvector_search._get_sentence_transformer.cache_clear()
+
+    try:
+        first_embedding = pgvector_search.model_encode_text("first")
+        second_embedding = pgvector_search.model_encode_text("second")
+
+        assert first_embedding == [5.0, 1.0]
+        assert second_embedding == [6.0, 1.0]
+        assert initialization_count == 1
+    finally:
+        pgvector_search._get_sentence_transformer.cache_clear()
 
 
 def test_indexes_questions_and_returns_similar_questions(monkeypatch):

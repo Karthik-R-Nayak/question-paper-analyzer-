@@ -29,7 +29,7 @@ each part easier to test and maintain.
 ### Suggested boundaries and data flow
 
 1. Paper ingestion validates a paper and its questions, then asks the question/paper and academic catalog modules to save the structured data.
-2. After a question is saved, semantic search generates and stores its embedding. Keep the relational `question_id` as the stable link to the vector record; do not treat a vector-store ID as the question itself.
+2. When a question is saved or updated, semantic search generates and stores its embedding in the same transaction. Keep the relational `question_id` as the stable link to the vector record; do not treat a vector-store ID as the question itself.
 3. Pattern analytics reads the relational data for counts and marks, and can use semantic search to group differently worded questions about similar concepts.
 4. The API coordinates requests from the UI and calls the relevant modules. The UI should not access either database directly.
 
@@ -56,8 +56,9 @@ request. It validates the subject, semester, question types, and topic mappings,
 then saves the paper and all related records in one transaction. Referenced
 subjects, semesters, question types, units, and topics must already exist;
 catalog management is a separate module. A question's topics must belong to the
-paper's subject. Embeddings are intentionally not generated during ingestion;
-semantic search can add them later as derived data.
+paper's subject. Embeddings are generated automatically during ingestion and
+when question text is updated. The semantic indexing endpoint can be used to
+backfill embeddings for questions saved before indexing was automatic.
 
 ### Second module: academic catalog
 
@@ -85,9 +86,9 @@ another paper still references it.
 
 The database layer owns SQLAlchemy engine and session creation. Set
 `DATABASE_URL` to choose the database; SQLite connections enforce the schema's
-foreign-key and cascade rules just like PostgreSQL. The API does not create the
-schema automatically: apply `exam_pattern_ddl.sql` to PostgreSQL before
-starting the application.
+foreign-key and cascade rules just like PostgreSQL. On startup, the API creates
+missing tables automatically for SQLite databases. For PostgreSQL, apply
+`exam_pattern_ddl.sql` before starting the application.
 
 To run the API locally:
 

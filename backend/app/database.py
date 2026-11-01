@@ -6,6 +6,8 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.models import Base
+
 
 def create_database_engine(database_url: str | None = None) -> Engine:
     url = database_url or os.getenv("DATABASE_URL") or "sqlite:///./app.db"
@@ -34,6 +36,12 @@ def get_database_engine() -> Engine:
 @lru_cache
 def get_session_factory() -> sessionmaker[Session]:
     return sessionmaker(bind=get_database_engine())
+
+
+def initialize_database() -> None:
+    engine = get_database_engine()
+    if engine.dialect.name == "sqlite":
+        Base.metadata.create_all(engine)
 
 
 def get_session() -> Generator[Session, None, None]:

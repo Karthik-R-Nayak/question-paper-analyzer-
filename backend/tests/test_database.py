@@ -1,9 +1,15 @@
 import pytest
-from sqlalchemy import create_engine, select
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, inspect, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.database import create_database_engine, get_session_factory
+from app.database import (
+    create_database_engine,
+    get_database_engine,
+    get_session_factory,
+)
+from app.main import app
 from app.models import Base, ExamPaper, Semester, Subject
 
 
@@ -57,3 +63,21 @@ def test_sqlite_subject_delete_cascades_to_exam_papers():
 
 def test_session_factory_reuses_configured_engine():
     assert get_session_factory() is get_session_factory()
+
+
+def test_app_startup_creates_schema_for_sqlite_database(tmp_path, monkeypatch):
+    database_path = tmp_path / "empty.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{database_path.as_posix()}")
+    get_session_factory.cache_clear()
+    get_database_engine.cache_clear()
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/api/v1/catalog/subjects")
+
+            assert response.status_code == 200
+            assert response.json() == []
+            assert "subject" in inspect(get_database_engine()).get_table_names()
+    finally:
+        get_session_factory.cache_clear()
+        get_database_engine.cache_clear()

@@ -1,13 +1,13 @@
 import json
 import os
 import re
+from functools import lru_cache
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import get_database_engine
-from app.models import Question
 
 try:
     from pgvector.sqlalchemy import Vector
@@ -20,22 +20,28 @@ def is_postgres_enabled() -> bool:
     return url.startswith("postgres") or url.startswith("postgresql")
 
 
-def ensure_pgvector_extension(session: Session) -> None:
+def ensure_pgvector_extension(session: Session, *, commit: bool = True) -> None:
     if not is_postgres_enabled():
         return
     session.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-    session.commit()
+    if commit:
+        session.commit()
 
 
 def get_embedding_dimensions() -> int:
     return 384
 
 
+@lru_cache(maxsize=1)
+def _get_sentence_transformer():
+    from sentence_transformers import SentenceTransformer
+
+    return SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+
+
 def model_encode_text(text: str) -> list[float]:
     try:
-        from sentence_transformers import SentenceTransformer
-
-        model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        model = _get_sentence_transformer()
         embedding = model.encode(text, normalize_embeddings=True)
         return [float(value) for value in embedding]
     except Exception:
@@ -54,11 +60,17 @@ def model_encode_text(text: str) -> list[float]:
         return values
 
 
-def upsert_question_embedding(session: Session, question_id: int, question_text: str) -> dict[str, Any]:
+def upsert_question_embedding(
+    session: Session,
+    question_id: int,
+    question_text: str,
+    *,
+    commit: bool = True,
+) -> dict[str, Any]:
     embedding = model_encode_text(question_text)
 
     if is_postgres_enabled():
-        ensure_pgvector_extension(session)
+        ensure_pgvector_extension(session, commit=commit)
         result = session.execute(
             text(
                 "INSERT INTO question_embedding (question_id, embedding) VALUES (:question_id, :embedding) "
@@ -66,7 +78,8 @@ def upsert_question_embedding(session: Session, question_id: int, question_text:
             ),
             {"question_id": question_id, "embedding": embedding},
         )
-        session.commit()
+        if commit:
+            session.commit()
         return {"question_id": question_id, "updated": result.rowcount or 0}
 
     session.execute(
@@ -75,7 +88,8 @@ def upsert_question_embedding(session: Session, question_id: int, question_text:
         ),
         {"question_id": question_id, "embedding": json.dumps(embedding)},
     )
-    session.commit()
+    if commit:
+        session.commit()
     return {"question_id": question_id, "updated": 1}
 
 
@@ -99,7 +113,12 @@ def similar_questions(session: Session, query: str, limit: int = 5):
         } for row in rows]
 
     rows = session.execute(
-        text("SELECT question_id, embedding FROM question_embedding")
+        text(
+            "SELECT question_embedding.question_id, question.question_text, "
+            "question_embedding.embedding "
+            "FROM question_embedding "
+            "JOIN question ON question.question_id = question_embedding.question_id"
+        )
     ).all()
     scored = []
     for row in rows:
@@ -107,7 +126,7 @@ def similar_questions(session: Session, query: str, limit: int = 5):
         score = cosine_similarity(query_embedding, stored)
         scored.append({
             "question_id": row.question_id,
-            "question_text": session.get(Question, row.question_id).question_text,
+            "question_text": row.question_text,
             "score": score,
         })
 

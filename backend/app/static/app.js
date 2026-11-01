@@ -273,6 +273,27 @@ function renderPaperQuestionRows() {
     .join('');
 }
 
+function syncPaperQuestionRow(event) {
+  const input = event.target;
+  const index = Number(input.dataset.index);
+  if (!Number.isInteger(index) || index < 0 || index >= state.paperRows.length) {
+    return;
+  }
+
+  const row = state.paperRows[index];
+  if (input.matches('.paper-question-number')) {
+    row.question_number = input.value;
+  } else if (input.matches('.paper-question-marks')) {
+    row.marks = Number(input.value);
+  } else if (input.matches('.paper-question-text')) {
+    row.question_text = input.value;
+  } else if (input.matches('.paper-question-type')) {
+    row.question_type_id = input.value ? Number(input.value) : '';
+  } else if (input.matches('.paper-question-topics')) {
+    row.topic_ids = Array.from(input.selectedOptions, (option) => Number(option.value));
+  }
+}
+
 function showPaperStatus(message, isError = false) {
   els.paperStatus.textContent = message;
   els.paperStatus.className = `status-message ${isError ? 'error' : 'success'}`;
@@ -369,7 +390,7 @@ function createPaperPayload() {
   const examType = els.paperExamType.value;
   const totalMarks = Number(els.paperTotalMarks.value);
 
-  const questions = Array.from(document.querySelectorAll('.paper-question-row')).map((row) => {
+  const questions = Array.from(els.paperQuestionRows.querySelectorAll('.paper-question-row')).map((row) => {
     const questionNumber = row.querySelector('.paper-question-number').value.trim();
     const marks = Number(row.querySelector('.paper-question-marks').value);
     const questionText = row.querySelector('.paper-question-text').value.trim();
@@ -383,7 +404,14 @@ function createPaperPayload() {
       question_type_id: typeId,
       topic_ids: topicIds
     };
-  });
+  }).filter((question) =>
+    question.question_number &&
+    Number.isInteger(question.marks) &&
+    question.marks > 0 &&
+    question.question_text &&
+    Number.isInteger(question.question_type_id) &&
+    question.question_type_id > 0
+  );
 
   return {
     subject_id: subjectId,
@@ -397,8 +425,7 @@ function createPaperPayload() {
 async function submitPaper() {
   const payload = createPaperPayload();
 
-  const requiredQuestions = payload.questions.filter((question) => question.question_text && question.question_type_id);
-  if (!payload.subject_id || !payload.semester_id || !payload.exam_type || !payload.total_marks || !requiredQuestions.length) {
+  if (!payload.subject_id || !payload.semester_id || !payload.exam_type || !payload.total_marks || !payload.questions.length) {
     showPaperStatus('Please fill in the subject, semester, exam type, total marks, and at least one valid question.', true);
     return;
   }
@@ -444,6 +471,9 @@ els.addQuestionBtn.addEventListener('click', () => {
   state.paperRows.push({ question_number: String(nextNumber), marks: 10, question_text: '', question_type_id: '', topic_ids: [] });
   renderPaperQuestionRows();
 });
+
+els.paperQuestionRows.addEventListener('input', syncPaperQuestionRow);
+els.paperQuestionRows.addEventListener('change', syncPaperQuestionRow);
 
 els.paperQuestionRows.addEventListener('click', (event) => {
   const button = event.target.closest('.remove-question');
