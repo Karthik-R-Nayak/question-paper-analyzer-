@@ -397,3 +397,39 @@ def pattern_analytics(
             for row in trends
         ],
     }
+
+
+@router.get("/analytics/subject-performance")
+def subject_performance(
+    subject_id: int | None = None,
+    session: Session = Depends(get_session),
+):
+    stmt = (
+        select(
+            Subject.subject_name,
+            Semester.semester_number,
+            Semester.academic_year,
+            func.count(PaperQuestion.question_id).label("question_count"),
+            func.sum(PaperQuestion.marks).label("total_marks"),
+        )
+        .join(ExamPaper, ExamPaper.subject_id == Subject.subject_id)
+        .join(Semester, Semester.semester_id == ExamPaper.semester_id)
+        .join(PaperQuestion, PaperQuestion.paper_id == ExamPaper.paper_id)
+        .group_by(Subject.subject_name, Semester.semester_number, Semester.academic_year)
+        .order_by(Semester.semester_number, Semester.academic_year)
+    )
+
+    if subject_id is not None:
+        stmt = stmt.where(Subject.subject_id == subject_id)
+
+    rows = session.execute(stmt).all()
+    return [
+        {
+            "subject_name": row.subject_name,
+            "semester_number": row.semester_number,
+            "academic_year": row.academic_year,
+            "question_count": row.question_count,
+            "total_marks": row.total_marks or 0,
+        }
+        for row in rows
+    ]

@@ -157,3 +157,35 @@ class PaperRead(BaseModel):
     exam_type: ExamType
     total_marks: int
     questions: list[PaperQuestionRead]
+
+
+class BulkImportQuestion(BaseModel):
+    question_number: QuestionNumber
+    marks: int = Field(gt=0)
+    question_text: QuestionText
+    question_type: str = ""
+    topic_name: str = ""
+    unit_name: str | None = None
+
+
+class BulkImportPaper(BaseModel):
+    subject_code: str | None = None
+    subject_name: str | None = None
+    semester_number: int = Field(ge=1, le=8)
+    academic_year: str = ""
+    exam_type: ExamType = ExamType.END
+    total_marks: int | None = None
+    questions: list[BulkImportQuestion] = Field(min_length=1)
+
+
+class BulkImportPayload(BaseModel):
+    papers: list[BulkImportPaper] = Field(min_length=1)
+
+
+class BulkImportResult(BaseModel):
+    created_papers: int
+    created_questions: int
+    created_subjects: int
+    created_semesters: int
+    created_topics: int
+    created_question_types: int

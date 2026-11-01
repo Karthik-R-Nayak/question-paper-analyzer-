@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_session
@@ -15,7 +15,14 @@ from app.models import (
     Topic,
     Unit,
 )
-from app.schemas import PaperCreate, PaperQuestionCreate, PaperQuestionRead, PaperRead
+from app.schemas import (
+    BulkImportPayload,
+    BulkImportResult,
+    PaperCreate,
+    PaperQuestionCreate,
+    PaperQuestionRead,
+    PaperRead,
+)
 
 router = APIRouter(prefix="/api/v1/papers", tags=["papers"])
 
@@ -400,3 +407,185 @@ def delete_paper_question(
         session.delete(link)
         _delete_orphaned_questions(session, {question_id})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _ensure_question_type(session: Session, type_name: str) -> QuestionType:
+    label = (type_name or "").strip()
+    if not label:
+        raise HTTPException(status_code=422, detail="Question type name is required for import.")
+    existing = session.scalar(
+        select(QuestionType).where(func.lower(QuestionType.type_name) == label.lower())
+    )
+    if existing is not None:
+        return existing
+    question_type = QuestionType(type_name=label)
+    session.add(question_type)
+    session.flush()
+    return question_type
+
+
+def _ensure_subject(session: Session, subject_code: str | None, subject_name: str | None) -> Subject:
+    input_code = (subject_code or "").strip()
+    input_name = (subject_name or "").strip()
+    if not input_code and not input_name:
+        raise HTTPException(status_code=422, detail="Subject code or subject name is required for import.")
+
+    if input_code:
+        existing = session.scalar(select(Subject).where(func.lower(Subject.subject_code) == input_code.lower()))
+        if existing is not None:
+            return existing
+    if input_name:
+        existing = session.scalar(select(Subject).where(func.lower(Subject.subject_name) == input_name.lower()))
+        if existing is not None:
+            return existing
+
+    code = input_code or input_name[:20].strip() or "SUBJ"
+    name = input_name or code
+    subject = Subject(subject_code=code, subject_name=name, department=None)
+    session.add(subject)
+    session.flush()
+    return subject
+
+
+def _ensure_semester(session: Session, semester_number: int, academic_year: str) -> Semester:
+    year = (academic_year or "2026-2027").strip() or "2026-2027"
+    existing = session.scalar(
+        select(Semester).where(
+            Semester.semester_number == semester_number,
+            func.lower(Semester.academic_year) == year.lower(),
+        )
+    )
+    if existing is not None:
+        return existing
+    semester = Semester(semester_number=semester_number, academic_year=year)
+    session.add(semester)
+    session.flush()
+    return semester
+
+
+def _ensure_unit(session: Session, subject_id: int, unit_name: str | None) -> Unit:
+    label = (unit_name or "").strip()
+    if not label:
+        raise HTTPException(status_code=422, detail="Each imported question needs a unit or topic name.")
+    existing = session.scalar(
+        select(Unit).where(Unit.subject_id == subject_id, func.lower(Unit.unit_name) == label.lower())
+    )
+    if existing is not None:
+        return existing
+
+    next_number = (
+        session.scalar(
+            select(func.max(Unit.unit_number)).where(Unit.subject_id == subject_id)
+        )
+        or 0
+    ) + 1
+    unit = Unit(subject_id=subject_id, unit_number=next_number, unit_name=label)
+    session.add(unit)
+    session.flush()
+    return unit
+
+
+def _ensure_topic(session: Session, unit_id: int, topic_name: str) -> Topic:
+    label = (topic_name or "").strip()
+    if not label:
+        raise HTTPException(status_code=422, detail="Topic name is required for import.")
+    existing = session.scalar(
+        select(Topic).where(Topic.unit_id == unit_id, func.lower(Topic.topic_name) == label.lower())
+    )
+    if existing is not None:
+        return existing
+    topic = Topic(unit_id=unit_id, topic_name=label)
+    session.add(topic)
+    session.flush()
+    return topic
+
+
+@router.post("/import", response_model=BulkImportResult, status_code=status.HTTP_201_CREATED)
+def bulk_import_papers(
+    payload: BulkImportPayload,
+    session: Session = Depends(get_session),
+) -> BulkImportResult:
+    if not payload.papers:
+        raise HTTPException(status_code=422, detail="At least one paper is required for import.")
+
+    created_subjects = 0
+    created_semesters = 0
+    created_topics = 0
+    created_question_types = 0
+    created_papers = 0
+    created_questions = 0
+
+    with session.begin():
+        for paper_data in payload.papers:
+            subject = _ensure_subject(session, paper_data.subject_code, paper_data.subject_name)
+            if subject.subject_id is None:
+                session.flush()
+            if subject.subject_id is None:
+                raise HTTPException(status_code=500, detail="Failed to create subject for imported paper.")
+
+            semester = _ensure_semester(session, paper_data.semester_number, paper_data.academic_year)
+            if semester.semester_id is None:
+                session.flush()
+
+            paper = ExamPaper(
+                subject_id=subject.subject_id,
+                semester_id=semester.semester_id,
+                exam_type=paper_data.exam_type.value,
+                total_marks=paper_data.total_marks or 0,
+            )
+            session.add(paper)
+            session.flush()
+            created_papers += 1
+
+            for question_data in paper_data.questions:
+                question_type = _ensure_question_type(session, question_data.question_type)
+                unit = _ensure_unit(
+                    session,
+                    subject.subject_id,
+                    question_data.unit_name or question_data.topic_name or "General",
+                )
+                topic = _ensure_topic(session, unit.unit_id, question_data.topic_name or question_data.question_text[:30])
+
+                question = Question(
+                    type_id=question_type.type_id,
+                    question_text=question_data.question_text,
+                )
+                session.add(question)
+                session.flush()
+                upsert_question_embedding(
+                    session,
+                    question.question_id,
+                    question.question_text,
+                    commit=False,
+                )
+                session.add(
+                    PaperQuestion(
+                        paper_id=paper.paper_id,
+                        question_id=question.question_id,
+                        question_number=question_data.question_number,
+                        marks=question_data.marks,
+                    )
+                )
+                session.add(
+                    QuestionTopic(
+                        question_id=question.question_id,
+                        topic_id=topic.topic_id,
+                    )
+                )
+                created_questions += 1
+                created_topics += 0
+                created_question_types += 0
+
+            if not session.new and subject.subject_id is not None:
+                created_subjects += 0
+            if not session.new and semester.semester_id is not None:
+                created_semesters += 0
+
+    return BulkImportResult(
+        created_papers=created_papers,
+        created_questions=created_questions,
+        created_subjects=created_subjects,
+        created_semesters=created_semesters,
+        created_topics=created_topics,
+        created_question_types=created_question_types,
+    )
