@@ -82,6 +82,20 @@ the question record itself, so changes are visible anywhere that question is
 referenced; removing a paper-question association preserves the question if
 another paper still references it.
 
+### User registration and login
+
+Users can register and log in with a username and password. Usernames are
+case-insensitively unique and must contain 3–32 characters; passwords must
+contain at least 8 characters. Passwords are stored as scrypt hashes. Login
+creates an opaque, revocable session in the database and sets an HttpOnly,
+Secure, SameSite=Lax cookie that expires after seven days. Logout revokes the
+current session.
+
+Read-only search, analytics, semantic similarity, paper, and catalog endpoints
+remain public. Paper, question, catalog, and semantic-index mutations require
+an authenticated session. Set `SESSION_COOKIE_SECURE=false` only for local
+development over plain HTTP; the default requires HTTPS.
+
 ### Fourth module: database access
 
 The database layer owns SQLAlchemy engine and session creation. Set

@@ -40,7 +40,12 @@ def client():
             yield session
 
     app.dependency_overrides[get_session] = override_session
-    with TestClient(app) as test_client:
+    with TestClient(app, base_url="https://testserver") as test_client:
+        registration = test_client.post(
+            "/api/v1/auth/register",
+            json={"username": "paper-user", "password": "paper-password"},
+        )
+        assert registration.status_code == 201
         yield test_client
     app.dependency_overrides.clear()
     engine.dispose()

@@ -1,4 +1,14 @@
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, Text, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 try:
@@ -22,6 +32,27 @@ class QuestionEmbedding(Base):
         Vector(384) if Vector is not None else Text,
         nullable=False,
     )
+
+
+class UserAccount(Base):
+    __tablename__ = "user_account"
+
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
+
+
+class UserSession(Base):
+    __tablename__ = "user_session"
+
+    session_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user_account.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
 
 
 class Subject(Base):

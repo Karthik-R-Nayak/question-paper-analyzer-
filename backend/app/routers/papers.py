@@ -16,6 +16,7 @@ from app.models import (
     Unit,
 )
 from app.schemas import PaperCreate, PaperQuestionCreate, PaperQuestionRead, PaperRead
+from app.security import require_user
 
 router = APIRouter(prefix="/api/v1/papers", tags=["papers"])
 
@@ -173,7 +174,12 @@ def _delete_orphaned_questions(session: Session, question_ids: set[int]) -> None
             session.delete(question)
 
 
-@router.post("", response_model=PaperRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=PaperRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_user)],
+)
 def create_paper(payload: PaperCreate, session: Session = Depends(get_session)) -> PaperRead:
     question_numbers = [question.question_number for question in payload.questions]
     if len(question_numbers) != len(set(question_numbers)):
@@ -227,7 +233,11 @@ def get_paper(
     return _paper_read(session, _require_paper(session, paper_id))
 
 
-@router.put("/{paper_id}", response_model=PaperRead)
+@router.put(
+    "/{paper_id}",
+    response_model=PaperRead,
+    dependencies=[Depends(require_user)],
+)
 def update_paper(
     payload: PaperCreate,
     paper_id: int = Path(gt=0),
@@ -270,7 +280,11 @@ def update_paper(
     return response
 
 
-@router.delete("/{paper_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{paper_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_user)],
+)
 def delete_paper(
     paper_id: int = Path(gt=0),
     session: Session = Depends(get_session),
@@ -294,6 +308,7 @@ def delete_paper(
     "/{paper_id}/questions",
     response_model=PaperQuestionRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_user)],
 )
 def add_paper_question(
     payload: PaperQuestionCreate,
@@ -322,6 +337,7 @@ def add_paper_question(
 @router.put(
     "/{paper_id}/questions/{question_id}",
     response_model=PaperQuestionRead,
+    dependencies=[Depends(require_user)],
 )
 def update_paper_question(
     payload: PaperQuestionCreate,
@@ -383,6 +399,7 @@ def update_paper_question(
 @router.delete(
     "/{paper_id}/questions/{question_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_user)],
 )
 def delete_paper_question(
     paper_id: int = Path(gt=0),

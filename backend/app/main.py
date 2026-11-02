@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -6,15 +6,18 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.database import initialize_database
+from app.database import get_session, initialize_database
+from app.routers.auth import router as auth_router
 from app.routers.analytics import router as analytics_router
 from app.routers.catalog import router as catalog_router
 from app.routers.papers import router as papers_router
 from app.routers.semantic import router as semantic_router
 
+
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    initialize_database()
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
+    if get_session not in _app.dependency_overrides:
+        initialize_database()
     yield
 
 
@@ -36,3 +39,4 @@ app.include_router(catalog_router)
 app.include_router(papers_router)
 app.include_router(analytics_router)
 app.include_router(semantic_router)
+app.include_router(auth_router)

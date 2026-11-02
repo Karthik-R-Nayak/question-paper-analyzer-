@@ -3,6 +3,7 @@ const state = {
   semesters: [],
   questionTypes: [],
   topics: [],
+  user: null,
   filters: {
     q: '',
     subject_id: '',
@@ -43,8 +44,24 @@ const els = {
   paperQuestionRows: document.getElementById('paperQuestionRows'),
   addQuestionBtn: document.getElementById('addQuestionBtn'),
   submitPaperBtn: document.getElementById('submitPaperBtn'),
-  paperStatus: document.getElementById('paperStatus')
+  paperStatus: document.getElementById('paperStatus'),
+  authUsername: document.getElementById('authUsername'),
+  openAuthBtn: document.getElementById('openAuthBtn'),
+  logoutBtn: document.getElementById('logoutBtn'),
+  authDialog: document.getElementById('authDialog'),
+  authForm: document.getElementById('authForm'),
+  authTitle: document.getElementById('authTitle'),
+  authUsernameInput: document.getElementById('authUsernameInput'),
+  authPasswordInput: document.getElementById('authPasswordInput'),
+  authSubmitBtn: document.getElementById('authSubmitBtn'),
+  authModeToggle: document.getElementById('authModeToggle'),
+  closeAuthBtn: document.getElementById('closeAuthBtn'),
+  authStatus: document.getElementById('authStatus'),
+  paperAuthNotice: document.getElementById('paperAuthNotice'),
+  paperAuthBtn: document.getElementById('paperAuthBtn')
 };
+
+let authMode = 'login';
 
 function setActiveTab(tabName) {
   els.tabButtons.forEach((button) => {
@@ -64,10 +81,98 @@ async function apiFetch(url, options = {}) {
   const response = await fetch(url, options);
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || `Request failed: ${response.status}`);
+    let message = text || `Request failed: ${response.status}`;
+    try {
+      const errorBody = JSON.parse(text);
+      if (typeof errorBody.detail === 'string') {
+        message = errorBody.detail;
+      }
+    } catch {
+      // Keep the response text when it is not JSON.
+    }
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+  if (response.status === 204) {
+    return null;
   }
   return response.json();
 }
+
+function updateAuthControls() {
+  const isLoggedIn = Boolean(state.user);
+  els.authUsername.hidden = !isLoggedIn;
+  els.authUsername.textContent = isLoggedIn ? state.user.username : '';
+  els.openAuthBtn.hidden = isLoggedIn;
+  els.logoutBtn.hidden = !isLoggedIn;
+  els.paperAuthNotice.hidden = isLoggedIn;
+}
+
+function openAuthDialog(mode = 'login', message = '') {
+  authMode = mode;
+  const isRegister = authMode === 'register';
+  els.authTitle.textContent = isRegister ? 'Create account' : 'Log in';
+  els.authSubmitBtn.textContent = isRegister ? 'Register' : 'Log in';
+  els.authModeToggle.textContent = isRegister ? 'Already have an account? Log in' : 'Create an account';
+  els.authPasswordInput.autocomplete = isRegister ? 'new-password' : 'current-password';
+  els.authStatus.textContent = message;
+  els.authStatus.className = `status-message ${message ? 'error' : ''}`;
+  if (!els.authDialog.open) {
+    els.authDialog.showModal();
+  }
+}
+
+async function loadAuthState() {
+  try {
+    state.user = await apiFetch('/api/v1/auth/me');
+  } catch (error) {
+    if (error.status !== 401) {
+      console.error(error);
+    }
+    state.user = null;
+  }
+  updateAuthControls();
+}
+
+els.openAuthBtn.addEventListener('click', () => openAuthDialog());
+els.paperAuthBtn.addEventListener('click', () => openAuthDialog());
+els.closeAuthBtn.addEventListener('click', () => els.authDialog.close());
+els.authModeToggle.addEventListener('click', () => {
+  openAuthDialog(authMode === 'login' ? 'register' : 'login');
+});
+
+els.authForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const isRegister = authMode === 'register';
+  try {
+    state.user = await apiFetch(`/api/v1/auth/${isRegister ? 'register' : 'login'}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: els.authUsernameInput.value,
+        password: els.authPasswordInput.value
+      })
+    });
+    updateAuthControls();
+    els.authDialog.close();
+    els.authForm.reset();
+  } catch (error) {
+    console.error(error);
+    els.authStatus.textContent = error.message || 'Unable to authenticate.';
+    els.authStatus.className = 'status-message error';
+  }
+});
+
+els.logoutBtn.addEventListener('click', async () => {
+  try {
+    await apiFetch('/api/v1/auth/logout', { method: 'POST' });
+    state.user = null;
+    updateAuthControls();
+  } catch (error) {
+    console.error(error);
+  }
+});
 
 function setLoadingState(message) {
   els.questionsList.innerHTML = `<div class="empty-state">${message}</div>`;
@@ -423,6 +528,11 @@ function createPaperPayload() {
 }
 
 async function submitPaper() {
+  if (!state.user) {
+    openAuthDialog('login', 'Log in or register before creating a paper.');
+    return;
+  }
+
   const payload = createPaperPayload();
 
   if (!payload.subject_id || !payload.semester_id || !payload.exam_type || !payload.total_marks || !payload.questions.length) {
@@ -467,6 +577,10 @@ els.semanticQueryInput.addEventListener('keydown', (event) => {
 });
 
 els.addQuestionBtn.addEventListener('click', () => {
+  if (!state.user) {
+    openAuthDialog('login', 'Log in or register before adding questions.');
+    return;
+  }
   const nextNumber = state.paperRows.length + 1;
   state.paperRows.push({ question_number: String(nextNumber), marks: 10, question_text: '', question_type_id: '', topic_ids: [] });
   renderPaperQuestionRows();
@@ -496,6 +610,7 @@ els.paperQuestionRows.addEventListener('click', (event) => {
 els.submitPaperBtn.addEventListener('click', submitPaper);
 
 async function init() {
+  await loadAuthState();
   await fetchCatalogData();
   await refreshData();
   if (els.semanticQueryInput.value.trim() === '') {

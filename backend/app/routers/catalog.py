@@ -19,6 +19,7 @@ from app.schemas import (
     UnitCreate,
     UnitRead,
 )
+from app.security import require_user
 
 router = APIRouter(prefix="/api/v1/catalog", tags=["academic catalog"])
 
@@ -63,6 +64,7 @@ def list_subjects(session: Session = Depends(get_session)) -> list[Subject]:
     "/subjects",
     response_model=SubjectRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_user)],
 )
 def create_subject(
     payload: SubjectCreate,
@@ -83,7 +85,11 @@ def get_subject(
     return _require_existing(session, Subject, subject_id, "Subject")
 
 
-@router.put("/subjects/{subject_id}", response_model=SubjectRead)
+@router.put(
+    "/subjects/{subject_id}",
+    response_model=SubjectRead,
+    dependencies=[Depends(require_user)],
+)
 def update_subject(
     payload: SubjectCreate,
     subject_id: int = Path(gt=0),
@@ -97,7 +103,11 @@ def update_subject(
         return subject
 
 
-@router.delete("/subjects/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/subjects/{subject_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_user)],
+)
 def delete_subject(
     subject_id: int = Path(gt=0),
     session: Session = Depends(get_session),
@@ -118,6 +128,7 @@ def list_semesters(session: Session = Depends(get_session)) -> list[Semester]:
     "/semesters",
     response_model=SemesterRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_user)],
 )
 def create_semester(
     payload: SemesterCreate,
@@ -138,7 +149,11 @@ def get_semester(
     return _require_existing(session, Semester, semester_id, "Semester")
 
 
-@router.put("/semesters/{semester_id}", response_model=SemesterRead)
+@router.put(
+    "/semesters/{semester_id}",
+    response_model=SemesterRead,
+    dependencies=[Depends(require_user)],
+)
 def update_semester(
     payload: SemesterCreate,
     semester_id: int = Path(gt=0),
@@ -152,7 +167,11 @@ def update_semester(
         return semester
 
 
-@router.delete("/semesters/{semester_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/semesters/{semester_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_user)],
+)
 def delete_semester(
     semester_id: int = Path(gt=0),
     session: Session = Depends(get_session),
@@ -169,7 +188,12 @@ def list_units(session: Session = Depends(get_session)) -> list[Unit]:
     return list(session.scalars(select(Unit).order_by(Unit.unit_id)))
 
 
-@router.post("/units", response_model=UnitRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/units",
+    response_model=UnitRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_user)],
+)
 def create_unit(
     payload: UnitCreate,
     session: Session = Depends(get_session),
@@ -190,7 +214,11 @@ def get_unit(
     return _require_existing(session, Unit, unit_id, "Unit")
 
 
-@router.put("/units/{unit_id}", response_model=UnitRead)
+@router.put(
+    "/units/{unit_id}",
+    response_model=UnitRead,
+    dependencies=[Depends(require_user)],
+)
 def update_unit(
     payload: UnitCreate,
     unit_id: int = Path(gt=0),
@@ -206,7 +234,11 @@ def update_unit(
         return unit
 
 
-@router.delete("/units/{unit_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/units/{unit_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_user)],
+)
 def delete_unit(
     unit_id: int = Path(gt=0),
     session: Session = Depends(get_session),
@@ -223,7 +255,12 @@ def list_topics(session: Session = Depends(get_session)) -> list[Topic]:
     return list(session.scalars(select(Topic).order_by(Topic.topic_id)))
 
 
-@router.post("/topics", response_model=TopicRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/topics",
+    response_model=TopicRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_user)],
+)
 def create_topic(
     payload: TopicCreate,
     session: Session = Depends(get_session),
@@ -244,7 +281,11 @@ def get_topic(
     return _require_existing(session, Topic, topic_id, "Topic")
 
 
-@router.put("/topics/{topic_id}", response_model=TopicRead)
+@router.put(
+    "/topics/{topic_id}",
+    response_model=TopicRead,
+    dependencies=[Depends(require_user)],
+)
 def update_topic(
     payload: TopicCreate,
     topic_id: int = Path(gt=0),
@@ -259,7 +300,11 @@ def update_topic(
         return topic
 
 
-@router.delete("/topics/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/topics/{topic_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_user)],
+)
 def delete_topic(
     topic_id: int = Path(gt=0),
     session: Session = Depends(get_session),
@@ -282,6 +327,7 @@ def list_question_types(session: Session = Depends(get_session)) -> list[Questio
     "/question-types",
     response_model=QuestionTypeRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_user)],
 )
 def create_question_type(
     payload: QuestionTypeCreate,
@@ -302,7 +348,11 @@ def get_question_type(
     return _require_existing(session, QuestionType, type_id, "Question type")
 
 
-@router.put("/question-types/{type_id}", response_model=QuestionTypeRead)
+@router.put(
+    "/question-types/{type_id}",
+    response_model=QuestionTypeRead,
+    dependencies=[Depends(require_user)],
+)
 def update_question_type(
     payload: QuestionTypeCreate,
     type_id: int = Path(gt=0),
@@ -315,7 +365,11 @@ def update_question_type(
         return question_type
 
 
-@router.delete("/question-types/{type_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/question-types/{type_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_user)],
+)
 def delete_question_type(
     type_id: int = Path(gt=0),
     session: Session = Depends(get_session),

@@ -47,6 +47,24 @@ QuestionTypeName = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=50),
 ]
+Username = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=3, max_length=32),
+]
+Password = Annotated[
+    str,
+    StringConstraints(min_length=8, max_length=1024),
+]
+
+
+class Credentials(BaseModel):
+    username: Username
+    password: Password
+
+
+class UserRead(BaseModel):
+    user_id: int
+    username: str
 
 
 class SubjectCreate(BaseModel):

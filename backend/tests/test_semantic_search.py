@@ -71,7 +71,11 @@ def test_indexes_questions_and_returns_similar_questions(monkeypatch):
 
     app.dependency_overrides[get_session] = override_session
     try:
-        with TestClient(app) as client:
+        with TestClient(app, base_url="https://testserver") as client:
+            registration = client.post(
+                "/api/v1/auth/register",
+                json={"username": "semantic-user", "password": "semantic-password"},
+            )
             index_response = client.post("/api/v1/semantic/index")
             search_response = client.get(
                 "/api/v1/semantic/similar",
@@ -81,6 +85,7 @@ def test_indexes_questions_and_returns_similar_questions(monkeypatch):
         app.dependency_overrides.clear()
         engine.dispose()
 
+    assert registration.status_code == 201
     assert index_response.status_code == 200
     assert index_response.json() == {"indexed_count": 2}
     assert search_response.status_code == 200

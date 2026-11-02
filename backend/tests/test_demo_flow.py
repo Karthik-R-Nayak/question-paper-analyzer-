@@ -37,11 +37,15 @@ def test_demo_flow(monkeypatch):
 
     app.dependency_overrides[get_session] = override_session
     try:
-        with TestClient(app) as client:
+        with TestClient(app, base_url="https://testserver") as client:
             homepage = client.get("/")
             assert homepage.status_code == 200
             assert client.get("/static/app.js").status_code == 200
             assert client.get("/static/styles.css").status_code == 200
+            assert client.post(
+                "/api/v1/auth/register",
+                json={"username": "demo-user", "password": "demo-password"},
+            ).status_code == 201
 
             subject = client.post(
                 "/api/v1/catalog/subjects",

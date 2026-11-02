@@ -1,12 +1,17 @@
+from pathlib import Path
 import os
 from collections.abc import Generator
 from functools import lru_cache
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.models import Base
+
+ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(ENV_FILE)
 
 
 def create_database_engine(database_url: str | None = None) -> Engine:

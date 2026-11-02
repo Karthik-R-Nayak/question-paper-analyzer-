@@ -38,6 +38,50 @@ body {
   flex-wrap: wrap;
 }
 
+.auth-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-controls button {
+  width: auto;
+  margin-top: 0;
+}
+
+.auth-dialog {
+  width: min(420px, calc(100% - 32px));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 24px;
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.auth-dialog::backdrop {
+  background: rgba(20, 33, 61, 0.45);
+}
+
+.auth-dialog label {
+  display: block;
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.auth-dialog .section-header {
+  align-items: center;
+}
+
+.auth-dialog .dialog-close {
+  width: auto;
+  margin: 0;
+}
+
+.auth-dialog #authModeToggle {
+  margin-top: 10px;
+}
+
 .eyebrow {
   margin: 0 0 8px;
   text-transform: uppercase;
