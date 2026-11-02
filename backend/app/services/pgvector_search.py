@@ -98,19 +98,38 @@ def similar_questions(session: Session, query: str, limit: int = 5):
 
     if is_postgres_enabled():
         ensure_pgvector_extension(session)
+        query_vector = "[" + ",".join(
+            str(float(value)) for value in query_embedding
+        ) + "]"
+
         rows = session.execute(
             text(
-                "SELECT q.question_id, q.question_text, 1 - (qe.embedding <=> :query_embedding) AS similarity "
-                "FROM question q JOIN question_embedding qe ON qe.question_id = q.question_id "
-                "ORDER BY qe.embedding <=> :query_embedding LIMIT :limit"
+                """
+                SELECT
+                    q.question_id,
+                    q.question_text,
+                    1 - (qe.embedding <=> CAST(:query_embedding AS vector))
+                        AS similarity
+                FROM question q
+                JOIN question_embedding qe
+                    ON qe.question_id = q.question_id
+                ORDER BY qe.embedding <=> CAST(:query_embedding AS vector)
+                LIMIT :limit
+                """
             ),
-            {"query_embedding": query_embedding, "limit": limit},
+            {
+                "query_embedding": query_vector,
+                "limit": limit,
+            },
         ).all()
-        return [{
-            "question_id": row.question_id,
-            "question_text": row.question_text,
-            "similarity_score": round(float(row.similarity), 4),
-        } for row in rows]
+        return [
+            {
+                "question_id": row.question_id,
+                "question_text": row.question_text,
+                "similarity_score": round(float(row.similarity), 4),
+            }
+            for row in rows
+        ]
 
     rows = session.execute(
         text(
