@@ -106,10 +106,24 @@ missing tables automatically for SQLite databases. For PostgreSQL, apply
 
 To run the API locally:
 
-1. Create a PostgreSQL database named `exam_pattern` and run
-   `exam_pattern_ddl.sql` against it.
+1. Install PostgreSQL and the pgvector server extension. From the repository
+   root, create the database, enable pgvector in that database, then apply the
+   schema:
+
+   ```sh
+   createdb exam_pattern
+   psql -d exam_pattern -c "CREATE EXTENSION IF NOT EXISTS vector;"
+   psql -d exam_pattern -f exam_pattern_ddl.sql
+   ```
+
+   The extension must be enabled before applying the schema because
+   `QUESTION_EMBEDDING.embedding` uses the PostgreSQL `VECTOR(384)` type.
 2. Install dependencies with `pip install -r backend/requirements.txt`.
-3. Set `DATABASE_URL` using the format in `backend/.env.example`.
+3. Set `DATABASE_URL` to
+   `postgresql+psycopg://USER:PASSWORD@localhost:5432/exam_pattern` in
+   `backend/.env`, replacing the role and password with your local PostgreSQL
+   credentials. For local HTTP development, set `SESSION_COOKIE_SECURE=false`
+   in the same file.
 4. Start the API from the `backend` directory with
    `uvicorn app.main:app --reload`.
 5. Open `/docs` on the local server to try the paper-ingestion and catalog APIs.

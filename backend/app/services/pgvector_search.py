@@ -1,6 +1,5 @@
 import json
 import os
-import re
 from functools import lru_cache
 from typing import Any
 
@@ -13,6 +12,10 @@ try:
     from pgvector.sqlalchemy import Vector
 except Exception:  # pragma: no cover - optional pgvector dependency
     Vector = None
+
+
+class SentenceTransformerUnavailableError(RuntimeError):
+    pass
 
 
 def is_postgres_enabled() -> bool:
@@ -34,30 +37,21 @@ def get_embedding_dimensions() -> int:
 
 @lru_cache(maxsize=1)
 def _get_sentence_transformer():
-    from sentence_transformers import SentenceTransformer
+    try:
+        from sentence_transformers import SentenceTransformer
 
-    return SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        return SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+    except Exception as exc:
+        raise SentenceTransformerUnavailableError(
+            "Unable to load sentence-transformers/all-MiniLM-L6-v2. "
+            "Semantic search requires the sentence-transformers model to be available."
+        ) from exc
 
 
 def model_encode_text(text: str) -> list[float]:
-    try:
-        model = _get_sentence_transformer()
-        embedding = model.encode(text, normalize_embeddings=True)
-        return [float(value) for value in embedding]
-    except Exception:
-        tokens = re.findall(r"[a-zA-Z0-9]+", (text or "").lower())
-        if not tokens:
-            return [0.0] * get_embedding_dimensions()
-
-        values = [0.0] * get_embedding_dimensions()
-        for token in tokens:
-            idx = abs(hash(token)) % get_embedding_dimensions()
-            values[idx] += 1.0
-
-        norm = sum(v * v for v in values) ** 0.5
-        if norm:
-            values = [v / norm for v in values]
-        return values
+    model = _get_sentence_transformer()
+    embedding = model.encode(text, normalize_embeddings=True)
+    return [float(value) for value in embedding]
 
 
 def upsert_question_embedding(

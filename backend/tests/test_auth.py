@@ -9,11 +9,15 @@ from sqlalchemy.pool import StaticPool
 from app.database import get_session
 from app.main import app
 from app.models import Base, UserAccount, UserSession
+from app.services import pgvector_search
 from app.security import hash_session_token
 
 
 @pytest.fixture
-def auth_client():
+def auth_client(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("SESSION_COOKIE_SECURE", "true")
+    monkeypatch.setattr(pgvector_search, "model_encode_text", lambda _text: [1.0, 0.0])
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -69,6 +73,31 @@ def test_register_login_and_logout_use_hashed_credentials_and_revocable_cookie(a
     )
     assert login.status_code == 200
     assert client.get("/api/v1/auth/me").status_code == 200
+
+
+def test_login_cookie_persists_on_localhost_when_secure_flag_is_disabled(
+    auth_client, monkeypatch
+):
+    client, _session_factory = auth_client
+    registration = client.post(
+        "/api/v1/auth/register",
+        json={"username": "localhost-user", "password": "localhost-password"},
+    )
+    assert registration.status_code == 201
+    assert client.post("/api/v1/auth/logout").status_code == 204
+
+    monkeypatch.setenv("SESSION_COOKIE_SECURE", "false")
+    with TestClient(app, base_url="http://localhost") as localhost_client:
+        login = localhost_client.post(
+            "/api/v1/auth/login",
+            json={"username": "localhost-user", "password": "localhost-password"},
+        )
+
+        assert login.status_code == 200
+        set_cookie = login.headers["set-cookie"].lower()
+        assert "httponly" in set_cookie
+        assert "secure" not in set_cookie
+        assert localhost_client.get("/api/v1/auth/me").json() == login.json()
 
 
 def test_registration_validation_and_duplicate_username(auth_client):

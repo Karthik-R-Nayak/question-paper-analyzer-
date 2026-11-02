@@ -1,6 +1,7 @@
 import sys
 from types import ModuleType
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -38,6 +39,62 @@ def test_sentence_transformer_model_is_loaded_once_and_reused(monkeypatch):
         assert initialization_count == 1
     finally:
         pgvector_search._get_sentence_transformer.cache_clear()
+
+
+def test_model_load_failure_is_reported_without_hash_embedding(monkeypatch):
+    class BrokenSentenceTransformer:
+        def __init__(self, _model_name):
+            raise OSError("model files unavailable")
+
+    module = ModuleType("sentence_transformers")
+    module.SentenceTransformer = BrokenSentenceTransformer
+    monkeypatch.setitem(sys.modules, "sentence_transformers", module)
+    pgvector_search._get_sentence_transformer.cache_clear()
+
+    try:
+        with pytest.raises(
+            pgvector_search.SentenceTransformerUnavailableError,
+            match="Semantic search requires",
+        ):
+            pgvector_search.model_encode_text("database normalization")
+    finally:
+        pgvector_search._get_sentence_transformer.cache_clear()
+
+
+def test_semantic_endpoint_reports_unavailable_model(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    def unavailable_model():
+        raise pgvector_search.SentenceTransformerUnavailableError(
+            "Semantic search requires the model."
+        )
+
+    monkeypatch.setattr(pgvector_search, "_get_sentence_transformer", unavailable_model)
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine)
+
+    def override_session():
+        with session_factory() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_session
+    try:
+        with TestClient(app, base_url="http://localhost") as client:
+            response = client.get(
+                "/api/v1/semantic/similar",
+                params={"q": "database normalization"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+        engine.dispose()
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Semantic search requires the model."
 
 
 def test_indexes_questions_and_returns_similar_questions(monkeypatch):

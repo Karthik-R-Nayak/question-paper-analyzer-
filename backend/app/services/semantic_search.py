@@ -1,12 +1,7 @@
 import math
-import re
-from collections import defaultdict
 from typing import Iterable
 
-try:
-    from sentence_transformers import SentenceTransformer
-except Exception:  # pragma: no cover - optional dependency fallback
-    SentenceTransformer = None
+from app.services.pgvector_search import model_encode_text
 
 
 class VectorIndex:
@@ -15,36 +10,12 @@ class VectorIndex:
         self.vectors: dict[int, list[float]] = {}
         self.text_by_question: dict[int, str] = {}
 
-        if SentenceTransformer is not None:
-            self.model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-        else:
-            self.model = None
-
     def encode(self, text: str) -> list[float]:
         cleaned = (text or "").strip()
         if not cleaned:
             return [0.0] * self.dimensions
 
-        if self.model is not None:
-            embedding = self.model.encode(cleaned, normalize_embeddings=True)
-            return [float(value) for value in embedding]
-
-        return self._hash_based_embedding(cleaned)
-
-    def _hash_based_embedding(self, text: str) -> list[float]:
-        tokens = re.findall(r"[a-zA-Z0-9]+", text.lower())
-        if not tokens:
-            return [0.0] * self.dimensions
-
-        vector = [0.0] * self.dimensions
-        for token in tokens:
-            index = abs(hash(token)) % self.dimensions
-            vector[index] += 1.0
-
-        norm = math.sqrt(sum(value * value for value in vector))
-        if norm:
-            vector = [value / norm for value in vector]
-        return vector
+        return model_encode_text(cleaned)
 
     def upsert(self, question_id: int, text: str) -> list[float]:
         embedding = self.encode(text)

@@ -2,8 +2,8 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Request, status
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.database import get_session, initialize_database
@@ -12,6 +12,7 @@ from app.routers.analytics import router as analytics_router
 from app.routers.catalog import router as catalog_router
 from app.routers.papers import router as papers_router
 from app.routers.semantic import router as semantic_router
+from app.services.pgvector_search import SentenceTransformerUnavailableError
 
 
 @asynccontextmanager
@@ -26,6 +27,18 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(SentenceTransformerUnavailableError)
+async def sentence_transformer_unavailable(
+    _: Request,
+    exc: SentenceTransformerUnavailableError,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={"detail": str(exc)},
+    )
+
 
 app.mount("/static", StaticFiles(directory=Path(__file__).resolve().parent / "static"), name="static")
 

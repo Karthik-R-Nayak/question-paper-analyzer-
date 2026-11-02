@@ -175,7 +175,18 @@ els.logoutBtn.addEventListener('click', async () => {
 });
 
 function setLoadingState(message) {
-  els.questionsList.innerHTML = `<div class="empty-state">${message}</div>`;
+  els.questionsList.innerHTML = `<div class="empty-state">${escapeHTML(message)}</div>`;
+}
+
+function escapeHTML(value) {
+  const escapedCharacters = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  };
+  return String(value ?? '').replace(/[&<>"']/g, (character) => escapedCharacters[character]);
 }
 
 function renderStats(data) {
@@ -191,8 +202,8 @@ function renderStats(data) {
     .map(
       (card) => `
         <div class="stat-card">
-          <div class="label">${card.label}</div>
-          <div class="value">${card.value}</div>
+          <div class="label">${escapeHTML(card.label)}</div>
+          <div class="value">${escapeHTML(card.value)}</div>
         </div>
       `
     )
@@ -207,10 +218,10 @@ function renderQuestionTypes(items) {
           (item) => `
             <div>
               <div class="chart-row">
-                <span>${item.type_name}</span>
-                <strong>${item.count}</strong>
+                <span>${escapeHTML(item.type_name)}</span>
+                <strong>${escapeHTML(item.count)}</strong>
               </div>
-              <div class="bar"><span style="width:${(item.count / max) * 100}%"></span></div>
+              <div class="bar"><span style="width:${escapeHTML((item.count / max) * 100)}%"></span></div>
             </div>
           `
         )
@@ -226,10 +237,10 @@ function renderTopics(items) {
           (item) => `
             <div>
               <div class="chart-row">
-                <span>${item.topic_name}</span>
-                <strong>${item.count}</strong>
+                <span>${escapeHTML(item.topic_name)}</span>
+                <strong>${escapeHTML(item.count)}</strong>
               </div>
-              <div class="bar"><span style="width:${(item.count / max) * 100}%"></span></div>
+              <div class="bar"><span style="width:${escapeHTML((item.count / max) * 100)}%"></span></div>
             </div>
           `
         )
@@ -259,11 +270,11 @@ function renderSemesterComparison(entries) {
           .map(
             (entry) => `
               <tr>
-                <td>${entry.subject_name}</td>
-                <td>${entry.semester_number}</td>
-                <td>${entry.academic_year}</td>
-                <td>${entry.question_count}</td>
-                <td>${entry.total_marks}</td>
+                <td>${escapeHTML(entry.subject_name)}</td>
+                <td>${escapeHTML(entry.semester_number)}</td>
+                <td>${escapeHTML(entry.academic_year)}</td>
+                <td>${escapeHTML(entry.question_count)}</td>
+                <td>${escapeHTML(entry.total_marks)}</td>
               </tr>
             `
           )
@@ -283,20 +294,20 @@ function renderQuestions(items) {
     .map(
       (item) => `
         <article class="question-card">
-          <h3>${item.question_text}</h3>
+          <h3>${escapeHTML(item.question_text)}</h3>
           <div class="meta">
-            <span>${item.subject_name}</span>
+            <span>${escapeHTML(item.subject_name)}</span>
             <span>•</span>
-            <span>${item.exam_type}</span>
+            <span>${escapeHTML(item.exam_type)}</span>
             <span>•</span>
-            <span>Sem ${item.semester_number}</span>
+            <span>Sem ${escapeHTML(item.semester_number)}</span>
             <span>•</span>
-            <span>${item.question_type}</span>
+            <span>${escapeHTML(item.question_type)}</span>
             <span>•</span>
-            <span>${item.marks} marks</span>
+            <span>${escapeHTML(item.marks)} marks</span>
           </div>
           <div class="topic-tags">
-            ${item.topics.length ? item.topics.map((topic) => `<span class="topic-tag">${topic}</span>`).join('') : '<span class="topic-tag">No topic tags</span>'}
+            ${item.topics.length ? item.topics.map((topic) => `<span class="topic-tag">${escapeHTML(topic)}</span>`).join('') : '<span class="topic-tag">No topic tags</span>'}
           </div>
         </article>
       `
@@ -314,11 +325,11 @@ function renderSimilarQuestions(items) {
     .map(
       (item) => `
         <article class="question-card">
-          <h3>${item.question_text}</h3>
+          <h3>${escapeHTML(item.question_text)}</h3>
           <div class="meta">
-            <span>Question #${item.question_id}</span>
+            <span>Question #${escapeHTML(item.question_id)}</span>
           </div>
-          <span class="similarity-score">Similarity: ${item.similarity_score}</span>
+          <span class="similarity-score">Similarity: ${escapeHTML(item.similarity_score)}</span>
         </article>
       `
     )
@@ -337,11 +348,11 @@ function renderPaperQuestionRows() {
           <div class="paper-row-grid">
             <label>
               Question no.
-              <input class="paper-question-number" data-index="${index}" type="text" value="${row.question_number}" />
+              <input class="paper-question-number" data-index="${index}" type="text" value="${escapeHTML(row.question_number)}" />
             </label>
             <label>
               Marks
-              <input class="paper-question-marks" data-index="${index}" type="number" min="1" value="${row.marks}" />
+              <input class="paper-question-marks" data-index="${index}" type="number" min="1" value="${escapeHTML(row.marks)}" />
             </label>
             <label>
               Type
@@ -350,7 +361,7 @@ function renderPaperQuestionRows() {
                 ${state.questionTypes
                   .map(
                     (type) =>
-                      `<option value="${type.type_id}" ${String(type.type_id) === String(row.question_type_id) ? 'selected' : ''}>${type.type_name}</option>`
+                      `<option value="${escapeHTML(type.type_id)}" ${String(type.type_id) === String(row.question_type_id) ? 'selected' : ''}>${escapeHTML(type.type_name)}</option>`
                   )
                   .join('')}
               </select>
@@ -358,7 +369,7 @@ function renderPaperQuestionRows() {
           </div>
           <label>
             Question text
-            <textarea class="paper-question-text" data-index="${index}" rows="3" placeholder="Type the question text...">${row.question_text}</textarea>
+            <textarea class="paper-question-text" data-index="${index}" rows="3" placeholder="Type the question text...">${escapeHTML(row.question_text)}</textarea>
           </label>
           <label>
             Topic(s)
@@ -366,7 +377,7 @@ function renderPaperQuestionRows() {
               ${state.topics
                 .map(
                   (topic) =>
-                    `<option value="${topic.topic_id}" ${row.topic_ids.includes(topic.topic_id) ? 'selected' : ''}>${topic.topic_name}</option>`
+                    `<option value="${escapeHTML(topic.topic_id)}" ${row.topic_ids.includes(topic.topic_id) ? 'selected' : ''}>${escapeHTML(topic.topic_name)}</option>`
                 )
                 .join('')}
             </select>
@@ -416,7 +427,10 @@ async function searchSimilarQuestions() {
     renderSimilarQuestions(items);
   } catch (error) {
     console.error(error);
-    els.similarQuestionsList.innerHTML = '<div class="empty-state">Unable to load semantic matches.</div>';
+    const message = document.createElement('div');
+    message.className = 'empty-state';
+    message.textContent = error.message || 'Unable to load semantic matches.';
+    els.similarQuestionsList.replaceChildren(message);
   }
 }
 
@@ -434,16 +448,16 @@ async function fetchCatalogData() {
   state.topics = topics;
 
   els.subjectFilter.innerHTML = '<option value="">All subjects</option>' +
-    subjects.map((s) => `<option value="${s.subject_id}">${s.subject_name}</option>`).join('');
+    subjects.map((s) => `<option value="${escapeHTML(s.subject_id)}">${escapeHTML(s.subject_name)}</option>`).join('');
 
   els.semesterFilter.innerHTML = '<option value="">All semesters</option>' +
-    semesters.map((s) => `<option value="${s.semester_id}">Sem ${s.semester_number} (${s.academic_year})</option>`).join('');
+    semesters.map((s) => `<option value="${escapeHTML(s.semester_id)}">Sem ${escapeHTML(s.semester_number)} (${escapeHTML(s.academic_year)})</option>`).join('');
 
   els.paperSubject.innerHTML = '<option value="">Choose subject</option>' +
-    subjects.map((s) => `<option value="${s.subject_id}">${s.subject_name}</option>`).join('');
+    subjects.map((s) => `<option value="${escapeHTML(s.subject_id)}">${escapeHTML(s.subject_name)}</option>`).join('');
 
   els.paperSemester.innerHTML = '<option value="">Choose semester</option>' +
-    semesters.map((s) => `<option value="${s.semester_id}">Sem ${s.semester_number} (${s.academic_year})</option>`).join('');
+    semesters.map((s) => `<option value="${escapeHTML(s.semester_id)}">Sem ${escapeHTML(s.semester_number)} (${escapeHTML(s.academic_year)})</option>`).join('');
 
   renderPaperQuestionRows();
 }

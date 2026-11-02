@@ -11,7 +11,9 @@ from app.services import pgvector_search
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(pgvector_search, "model_encode_text", lambda _text: [1.0, 0.0])
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},

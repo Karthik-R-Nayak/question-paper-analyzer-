@@ -114,10 +114,10 @@ POST /api/v1/papers</pre>
         </div>
 
         <ol class="steps">
-          <li>Open the backend folder.</li>
-          <li>Create or configure PostgreSQL and run the SQL schema in <code>exam_pattern_ddl.sql</code>.</li>
-          <li>Install dependencies.</li>
-          <li>Set <code>DATABASE_URL</code>.</li>
+          <li>From the repository root, install PostgreSQL with pgvector available and run the database setup commands below.</li>
+          <li>Install PostgreSQL with pgvector available. From the repository root, run <code>createdb exam_pattern</code>, then <code>psql -d exam_pattern -c "CREATE EXTENSION IF NOT EXISTS vector;"</code>, followed by <code>psql -d exam_pattern -f exam_pattern_ddl.sql</code>.</li>
+          <li>Install dependencies with <code>pip install -r backend/requirements.txt</code>.</li>
+          <li>Set <code>DATABASE_URL</code>. For local HTTP development, also set <code>SESSION_COOKIE_SECURE=false</code>.</li>
           <li>Run: <code>uvicorn app.main:app --reload</code></li>
           <li>Open the app at <code>http://127.0.0.1:8000</code></li>
         </ol>
