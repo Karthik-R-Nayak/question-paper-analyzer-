@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_session
+from app.sql_loader import execute_sql
 from app.models import Question, QuestionType, Semester, Subject, Topic, Unit
 from app.schemas import (
     QuestionTypeCreate,
@@ -376,9 +377,12 @@ def delete_question_type(
 ) -> Response:
     with session.begin():
         question_type = _require_existing(session, QuestionType, type_id, "Question type")
-        if session.scalar(
-            select(Question.question_id).where(Question.type_id == type_id).limit(1)
-        ):
+        if execute_sql(
+            session,
+            "questions.sql",
+            "question_type_is_used",
+            {"type_id": type_id},
+        ).first() is not None:
             raise HTTPException(
                 status_code=409,
                 detail="Cannot delete a question type that is used by questions.",

@@ -100,6 +100,19 @@ def test_login_cookie_persists_on_localhost_when_secure_flag_is_disabled(
         assert localhost_client.get("/api/v1/auth/me").json() == login.json()
 
 
+def test_cors_allows_configured_next_origin_with_credentials(auth_client):
+    client, _session_factory = auth_client
+
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Origin": "http://localhost:3000"},
+    )
+
+    assert response.status_code == 401
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert response.headers["access-control-allow-credentials"] == "true"
+
+
 def test_registration_validation_and_duplicate_username(auth_client):
     client, _session_factory = auth_client
 

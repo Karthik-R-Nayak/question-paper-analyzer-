@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_session
-from app.models import Question
 from app.services.pgvector_search import similar_questions, upsert_question_embedding
+from app.sql_loader import execute_sql
 from app.security import require_user
 
 router = APIRouter(prefix="/api/v1/semantic", tags=["semantic search"])
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/v1/semantic", tags=["semantic search"])
 
 @router.post("/index", dependencies=[Depends(require_user)])
 def index_questions(session: Session = Depends(get_session)):
-    rows = session.query(Question.question_id, Question.question_text).all()
+    rows = execute_sql(session, "semantics.sql", "index_questions").all()
     for question_id, question_text in rows:
         upsert_question_embedding(session, question_id, question_text)
     return {"indexed_count": len(rows)}

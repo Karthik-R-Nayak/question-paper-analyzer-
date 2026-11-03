@@ -5,6 +5,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    Index,
     String,
     Text,
     UniqueConstraint,
@@ -44,12 +45,16 @@ class UserAccount(Base):
 
 class UserSession(Base):
     __tablename__ = "user_session"
+    __table_args__ = (Index("user_session_user_id_idx", "user_id"),)
 
     session_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("user_account.user_id", ondelete="CASCADE"),
+        ForeignKey(
+            "user_account.user_id",
+            ondelete="CASCADE",
+            onupdate="CASCADE",
+        ),
         nullable=False,
-        index=True,
     )
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(), nullable=False)

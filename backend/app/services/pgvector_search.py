@@ -3,16 +3,9 @@ import os
 from functools import lru_cache
 from typing import Any
 
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.database import get_database_engine
-
-try:
-    from pgvector.sqlalchemy import Vector
-except Exception:  # pragma: no cover - optional pgvector dependency
-    Vector = None
-
+from app.sql_loader import execute_sql
 
 class SentenceTransformerUnavailableError(RuntimeError):
     pass
@@ -26,7 +19,7 @@ def is_postgres_enabled() -> bool:
 def ensure_pgvector_extension(session: Session, *, commit: bool = True) -> None:
     if not is_postgres_enabled():
         return
-    session.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    execute_sql(session, "schema.sql", "ensure_pgvector_extension")
     if commit:
         session.commit()
 
@@ -65,21 +58,20 @@ def upsert_question_embedding(
 
     if is_postgres_enabled():
         ensure_pgvector_extension(session, commit=commit)
-        result = session.execute(
-            text(
-                "INSERT INTO question_embedding (question_id, embedding) VALUES (:question_id, :embedding) "
-                "ON CONFLICT (question_id) DO UPDATE SET embedding = EXCLUDED.embedding"
-            ),
+        result = execute_sql(
+            session,
+            "semantics.sql",
+            "upsert_embedding_postgresql",
             {"question_id": question_id, "embedding": embedding},
         )
         if commit:
             session.commit()
         return {"question_id": question_id, "updated": result.rowcount or 0}
 
-    session.execute(
-        text(
-            "INSERT OR REPLACE INTO question_embedding (question_id, embedding) VALUES (:question_id, :embedding)"
-        ),
+    execute_sql(
+        session,
+        "semantics.sql",
+        "upsert_embedding_sqlite",
         {"question_id": question_id, "embedding": json.dumps(embedding)},
     )
     if commit:
@@ -96,21 +88,10 @@ def similar_questions(session: Session, query: str, limit: int = 5):
             str(float(value)) for value in query_embedding
         ) + "]"
 
-        rows = session.execute(
-            text(
-                """
-                SELECT
-                    q.question_id,
-                    q.question_text,
-                    1 - (qe.embedding <=> CAST(:query_embedding AS vector))
-                        AS similarity
-                FROM question q
-                JOIN question_embedding qe
-                    ON qe.question_id = q.question_id
-                ORDER BY qe.embedding <=> CAST(:query_embedding AS vector)
-                LIMIT :limit
-                """
-            ),
+        rows = execute_sql(
+            session,
+            "semantics.sql",
+            "similar_questions_postgresql",
             {
                 "query_embedding": query_vector,
                 "limit": limit,
@@ -125,13 +106,8 @@ def similar_questions(session: Session, query: str, limit: int = 5):
             for row in rows
         ]
 
-    rows = session.execute(
-        text(
-            "SELECT question_embedding.question_id, question.question_text, "
-            "question_embedding.embedding "
-            "FROM question_embedding "
-            "JOIN question ON question.question_id = question_embedding.question_id"
-        )
+    rows = execute_sql(
+        session, "semantics.sql", "similar_questions_sqlite"
     ).all()
     scored = []
     for row in rows:
