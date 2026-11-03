@@ -5,16 +5,16 @@ WITH question_scope AS (
     SELECT pq.question_id, ep.subject_id, ep.semester_id, ep.exam_type
     FROM paper_question AS pq
     JOIN exam_paper AS ep ON ep.paper_id = pq.paper_id
-    WHERE (:subject_id IS NULL OR ep.subject_id = :subject_id)
-      AND (:semester_id IS NULL OR ep.semester_id = :semester_id)
-      AND (:exam_type IS NULL OR ep.exam_type = :exam_type)
+    WHERE (CAST(:subject_id AS INTEGER) IS NULL OR ep.subject_id = CAST(:subject_id AS INTEGER))
+      AND (CAST(:semester_id AS INTEGER) IS NULL OR ep.semester_id = CAST(:semester_id AS INTEGER))
+      AND (CAST(:exam_type AS VARCHAR(20)) IS NULL OR ep.exam_type = CAST(:exam_type AS VARCHAR(20)))
 )
 SELECT
     (SELECT COUNT(*)
      FROM exam_paper AS ep
-     WHERE (:subject_id IS NULL OR ep.subject_id = :subject_id)
-       AND (:semester_id IS NULL OR ep.semester_id = :semester_id)
-       AND (:exam_type IS NULL OR ep.exam_type = :exam_type)) AS papers,
+     WHERE (CAST(:subject_id AS INTEGER) IS NULL OR ep.subject_id = CAST(:subject_id AS INTEGER))
+       AND (CAST(:semester_id AS INTEGER) IS NULL OR ep.semester_id = CAST(:semester_id AS INTEGER))
+       AND (CAST(:exam_type AS VARCHAR(20)) IS NULL OR ep.exam_type = CAST(:exam_type AS VARCHAR(20)))) AS papers,
     (SELECT COUNT(*) FROM question_scope) AS questions,
     (SELECT COUNT(*) FROM subject) AS subjects,
     (SELECT COUNT(*) FROM semester) AS semesters;
@@ -24,9 +24,9 @@ WITH question_scope AS (
     SELECT pq.question_id, ep.subject_id, ep.semester_id, ep.exam_type
     FROM paper_question AS pq
     JOIN exam_paper AS ep ON ep.paper_id = pq.paper_id
-    WHERE (:subject_id IS NULL OR ep.subject_id = :subject_id)
-      AND (:semester_id IS NULL OR ep.semester_id = :semester_id)
-      AND (:exam_type IS NULL OR ep.exam_type = :exam_type)
+    WHERE (CAST(:subject_id AS INTEGER) IS NULL OR ep.subject_id = CAST(:subject_id AS INTEGER))
+      AND (CAST(:semester_id AS INTEGER) IS NULL OR ep.semester_id = CAST(:semester_id AS INTEGER))
+      AND (CAST(:exam_type AS VARCHAR(20)) IS NULL OR ep.exam_type = CAST(:exam_type AS VARCHAR(20)))
 )
 SELECT qt.type_name, COUNT(qs.question_id) AS count
 FROM question_type AS qt
@@ -40,9 +40,9 @@ WITH question_scope AS (
     SELECT pq.question_id, ep.subject_id, ep.semester_id, ep.exam_type
     FROM paper_question AS pq
     JOIN exam_paper AS ep ON ep.paper_id = pq.paper_id
-    WHERE (:subject_id IS NULL OR ep.subject_id = :subject_id)
-      AND (:semester_id IS NULL OR ep.semester_id = :semester_id)
-      AND (:exam_type IS NULL OR ep.exam_type = :exam_type)
+    WHERE (CAST(:subject_id AS INTEGER) IS NULL OR ep.subject_id = CAST(:subject_id AS INTEGER))
+      AND (CAST(:semester_id AS INTEGER) IS NULL OR ep.semester_id = CAST(:semester_id AS INTEGER))
+      AND (CAST(:exam_type AS VARCHAR(20)) IS NULL OR ep.exam_type = CAST(:exam_type AS VARCHAR(20)))
 )
 SELECT t.topic_name, COUNT(qs.question_id) AS count
 FROM topic AS t
@@ -56,9 +56,9 @@ WITH question_scope AS (
     SELECT pq.question_id, ep.subject_id, ep.semester_id, ep.exam_type
     FROM paper_question AS pq
     JOIN exam_paper AS ep ON ep.paper_id = pq.paper_id
-    WHERE (:subject_id IS NULL OR ep.subject_id = :subject_id)
-      AND (:semester_id IS NULL OR ep.semester_id = :semester_id)
-      AND (:exam_type IS NULL OR ep.exam_type = :exam_type)
+    WHERE (CAST(:subject_id AS INTEGER) IS NULL OR ep.subject_id = CAST(:subject_id AS INTEGER))
+      AND (CAST(:semester_id AS INTEGER) IS NULL OR ep.semester_id = CAST(:semester_id AS INTEGER))
+      AND (CAST(:exam_type AS VARCHAR(20)) IS NULL OR ep.exam_type = CAST(:exam_type AS VARCHAR(20)))
 )
 SELECT sem.semester_number, sem.academic_year, COUNT(qs.question_id) AS count
 FROM semester AS sem
@@ -74,7 +74,7 @@ JOIN exam_paper AS ep ON ep.subject_id = s.subject_id
 JOIN semester AS sem ON sem.semester_id = ep.semester_id
 JOIN paper_question AS pq ON pq.paper_id = ep.paper_id
 JOIN question AS q ON q.question_id = pq.question_id
-WHERE (:subject_id IS NULL OR s.subject_id = :subject_id)
+WHERE (CAST(:subject_id AS INTEGER) IS NULL OR s.subject_id = CAST(:subject_id AS INTEGER))
 GROUP BY s.subject_name, sem.semester_number, sem.academic_year
 ORDER BY sem.semester_number;
 
@@ -83,9 +83,9 @@ WITH question_scope AS (
     SELECT pq.paper_id, pq.question_id, pq.marks, ep.subject_id, ep.semester_id, ep.exam_type
     FROM paper_question AS pq
     JOIN exam_paper AS ep ON ep.paper_id = pq.paper_id
-    WHERE (:subject_id IS NULL OR ep.subject_id = :subject_id)
-      AND (:semester_id IS NULL OR ep.semester_id = :semester_id)
-      AND (:exam_type IS NULL OR ep.exam_type = :exam_type)
+    WHERE (CAST(:subject_id AS INTEGER) IS NULL OR ep.subject_id = CAST(:subject_id AS INTEGER))
+      AND (CAST(:semester_id AS INTEGER) IS NULL OR ep.semester_id = CAST(:semester_id AS INTEGER))
+      AND (CAST(:exam_type AS VARCHAR(20)) IS NULL OR ep.exam_type = CAST(:exam_type AS VARCHAR(20)))
 )
 SELECT s.subject_name, u.unit_name, SUM(qs.marks) AS total_marks
 FROM question_scope AS qs
@@ -93,7 +93,7 @@ JOIN question_topic AS qt ON qt.question_id = qs.question_id
 JOIN topic AS t ON t.topic_id = qt.topic_id
 JOIN unit AS u ON u.unit_id = t.unit_id
 JOIN subject AS s ON s.subject_id = u.subject_id
-WHERE (:subject_id IS NULL OR s.subject_id = :subject_id)
+WHERE (CAST(:subject_id AS INTEGER) IS NULL OR s.subject_id = CAST(:subject_id AS INTEGER))
 GROUP BY s.subject_name, u.unit_name
 ORDER BY SUM(qs.marks) DESC, u.unit_name;
 
@@ -102,9 +102,9 @@ WITH question_scope AS (
     SELECT pq.paper_id, pq.question_id, pq.marks, ep.subject_id, ep.semester_id, ep.exam_type
     FROM paper_question AS pq
     JOIN exam_paper AS ep ON ep.paper_id = pq.paper_id
-    WHERE (:subject_id IS NULL OR ep.subject_id = :subject_id)
-      AND (:semester_id IS NULL OR ep.semester_id = :semester_id)
-      AND (:exam_type IS NULL OR ep.exam_type = :exam_type)
+    WHERE (CAST(:subject_id AS INTEGER) IS NULL OR ep.subject_id = CAST(:subject_id AS INTEGER))
+      AND (CAST(:semester_id AS INTEGER) IS NULL OR ep.semester_id = CAST(:semester_id AS INTEGER))
+      AND (CAST(:exam_type AS VARCHAR(20)) IS NULL OR ep.exam_type = CAST(:exam_type AS VARCHAR(20)))
 )
 SELECT s.subject_name, t.topic_name,
        COUNT(qs.question_id) AS frequency,
@@ -123,9 +123,9 @@ WITH question_scope AS (
     SELECT pq.paper_id, pq.question_id, pq.marks, ep.subject_id, ep.semester_id, ep.exam_type
     FROM paper_question AS pq
     JOIN exam_paper AS ep ON ep.paper_id = pq.paper_id
-    WHERE (:subject_id IS NULL OR ep.subject_id = :subject_id)
-      AND (:semester_id IS NULL OR ep.semester_id = :semester_id)
-      AND (:exam_type IS NULL OR ep.exam_type = :exam_type)
+    WHERE (CAST(:subject_id AS INTEGER) IS NULL OR ep.subject_id = CAST(:subject_id AS INTEGER))
+      AND (CAST(:semester_id AS INTEGER) IS NULL OR ep.semester_id = CAST(:semester_id AS INTEGER))
+      AND (CAST(:exam_type AS VARCHAR(20)) IS NULL OR ep.exam_type = CAST(:exam_type AS VARCHAR(20)))
 )
 SELECT qt.type_name, COUNT(qs.question_id) AS count, SUM(qs.marks) AS total_marks
 FROM question_type AS qt
@@ -139,9 +139,9 @@ WITH question_scope AS (
     SELECT pq.paper_id, pq.question_id, pq.marks, ep.subject_id, ep.semester_id, ep.exam_type
     FROM paper_question AS pq
     JOIN exam_paper AS ep ON ep.paper_id = pq.paper_id
-    WHERE (:subject_id IS NULL OR ep.subject_id = :subject_id)
-      AND (:semester_id IS NULL OR ep.semester_id = :semester_id)
-      AND (:exam_type IS NULL OR ep.exam_type = :exam_type)
+    WHERE (CAST(:subject_id AS INTEGER) IS NULL OR ep.subject_id = CAST(:subject_id AS INTEGER))
+      AND (CAST(:semester_id AS INTEGER) IS NULL OR ep.semester_id = CAST(:semester_id AS INTEGER))
+      AND (CAST(:exam_type AS VARCHAR(20)) IS NULL OR ep.exam_type = CAST(:exam_type AS VARCHAR(20)))
 )
 SELECT t.topic_name, COUNT(qs.question_id) AS frequency, SUM(qs.marks) AS total_marks
 FROM topic AS t
@@ -155,9 +155,9 @@ WITH question_scope AS (
     SELECT pq.paper_id, pq.question_id, pq.marks, ep.subject_id, ep.semester_id, ep.exam_type
     FROM paper_question AS pq
     JOIN exam_paper AS ep ON ep.paper_id = pq.paper_id
-    WHERE (:subject_id IS NULL OR ep.subject_id = :subject_id)
-      AND (:semester_id IS NULL OR ep.semester_id = :semester_id)
-      AND (:exam_type IS NULL OR ep.exam_type = :exam_type)
+    WHERE (CAST(:subject_id AS INTEGER) IS NULL OR ep.subject_id = CAST(:subject_id AS INTEGER))
+      AND (CAST(:semester_id AS INTEGER) IS NULL OR ep.semester_id = CAST(:semester_id AS INTEGER))
+      AND (CAST(:exam_type AS VARCHAR(20)) IS NULL OR ep.exam_type = CAST(:exam_type AS VARCHAR(20)))
 )
 SELECT s.subject_name, sem.semester_number, sem.academic_year,
        COUNT(qs.question_id) AS question_count, SUM(qs.marks) AS total_marks

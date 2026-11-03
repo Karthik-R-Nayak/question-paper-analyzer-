@@ -21,10 +21,14 @@ JOIN exam_paper AS ep ON ep.paper_id = pq.paper_id
 JOIN subject AS s ON s.subject_id = ep.subject_id
 JOIN semester AS sem ON sem.semester_id = ep.semester_id
 JOIN question_type AS qt ON qt.type_id = q.type_id
-WHERE (:search_pattern IS NULL OR LOWER(q.question_text) LIKE :search_pattern)
-  AND (:subject_id IS NULL OR s.subject_id = :subject_id)
-  AND (:semester_id IS NULL OR sem.semester_id = :semester_id)
-  AND (:exam_type IS NULL OR ep.exam_type = :exam_type)
+WHERE (CAST(:search_pattern AS TEXT) IS NULL
+       OR LOWER(q.question_text) LIKE CAST(:search_pattern AS TEXT))
+  AND (CAST(:subject_id AS INTEGER) IS NULL
+       OR s.subject_id = CAST(:subject_id AS INTEGER))
+  AND (CAST(:semester_id AS INTEGER) IS NULL
+       OR sem.semester_id = CAST(:semester_id AS INTEGER))
+  AND (CAST(:exam_type AS VARCHAR(20)) IS NULL
+       OR ep.exam_type = CAST(:exam_type AS VARCHAR(20)))
 ORDER BY q.question_id DESC
 LIMIT :limit;
 

@@ -96,5 +96,6 @@ SELECT question_id
 FROM paper_question
 WHERE paper_id = :paper_id
   AND question_number = :question_number
-  AND (:exclude_question_id IS NULL OR question_id <> :exclude_question_id)
+  AND (CAST(:exclude_question_id AS INTEGER) IS NULL
+       OR question_id <> CAST(:exclude_question_id AS INTEGER))
 LIMIT 1;

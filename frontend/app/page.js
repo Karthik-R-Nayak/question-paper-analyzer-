@@ -1,8 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { ApiError, apiFetch } from "../lib/api.js";
+import {
+  buildPaperPayload,
+  filterTopics,
+  removeTopicId,
+  toggleTopicId
+} from "../lib/topic-selection.js";
 
 const EMPTY_QUESTION = {
   question_number: "1",
@@ -84,7 +90,171 @@ function QuestionCards({ items }) {
   );
 }
 
-function PaperQuestionEditor({ question, index, questionTypes, topics, onChange, onRemove }) {
+function TopicMultiSelect({ question, topics, units, subjectId, onChange }) {
+  const [search, setSearch] = useState("");
+  const [unitId, setUnitId] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const inputId = useId();
+  const listboxId = useId();
+  const inputRef = useRef(null);
+  const selectorRef = useRef(null);
+  const subjectUnits = units.filter(
+    (unit) => String(unit.subject_id) === String(subjectId)
+  );
+  const filteredTopics = filterTopics(topics, units, subjectId, unitId, search);
+
+  useEffect(() => {
+    setUnitId("");
+    setActiveIndex(-1);
+  }, [subjectId]);
+
+  function updateSelection(topicId) {
+    onChange(toggleTopicId(question.topic_ids, topicId));
+    setActiveIndex(-1);
+    inputRef.current?.focus();
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === "ArrowDown" && filteredTopics.length) {
+      event.preventDefault();
+      setIsOpen(true);
+      setActiveIndex((index) => Math.min(index + 1, filteredTopics.length - 1));
+    } else if (event.key === "ArrowUp" && filteredTopics.length) {
+      event.preventDefault();
+      setIsOpen(true);
+      setActiveIndex((index) => Math.max(index - 1, 0));
+    } else if (event.key === "Enter" && isOpen && filteredTopics.length) {
+      event.preventDefault();
+      updateSelection((filteredTopics[activeIndex] || filteredTopics[0]).topic_id);
+    } else if (event.key === "Escape") {
+      setIsOpen(false);
+    }
+  }
+
+  return (
+    <div
+      className="topic-selector"
+      ref={selectorRef}
+      onBlur={(event) => {
+        if (!selectorRef.current?.contains(event.relatedTarget)) setIsOpen(false);
+      }}
+    >
+      <label htmlFor={inputId}>Topic(s)</label>
+      <div className="topic-selected-tags" aria-label="Selected topics">
+        {question.topic_ids.map((topicId) => {
+          const topic = topics.find((item) => item.topic_id === topicId);
+          const topicName = topic?.topic_name || `Topic ${topicId}`;
+          return (
+            <span className="topic-selection-chip" key={topicId}>
+              {topicName}
+              <button
+                type="button"
+                aria-label={`Remove ${topicName}`}
+                onClick={() => onChange(removeTopicId(question.topic_ids, topicId))}
+              >
+                ×
+              </button>
+            </span>
+          );
+        })}
+      </div>
+      <div className="topic-selector-controls">
+        <input
+          ref={inputRef}
+          id={inputId}
+          type="search"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={isOpen}
+          aria-controls={listboxId}
+          aria-activedescendant={
+            isOpen && activeIndex >= 0 && filteredTopics[activeIndex]
+              ? `${listboxId}-option-${filteredTopics[activeIndex].topic_id}`
+              : undefined
+          }
+          autoComplete="off"
+          placeholder="Search topics..."
+          value={search}
+          onFocus={() => setIsOpen(true)}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setActiveIndex(-1);
+            setIsOpen(true);
+          }}
+          onKeyDown={handleKeyDown}
+        />
+        <label className="visually-hidden" htmlFor={`${inputId}-unit`}>
+          Filter topics by unit
+        </label>
+        <select
+          id={`${inputId}-unit`}
+          aria-label="Filter topics by unit"
+          value={unitId}
+          onChange={(event) => {
+            setUnitId(event.target.value);
+            setActiveIndex(-1);
+            setIsOpen(true);
+          }}
+        >
+          <option value="">All units</option>
+          {subjectUnits.map((unit) => (
+            <option value={unit.unit_id} key={unit.unit_id}>
+              Unit {unit.unit_number}: {unit.unit_name}
+            </option>
+          ))}
+        </select>
+      </div>
+      {isOpen && (
+        <div className="topic-options">
+          {filteredTopics.length ? (
+            <div id={listboxId} role="listbox" aria-label="Available topics" aria-multiselectable="true">
+              {filteredTopics.map((topic, index) => {
+                const selected = question.topic_ids.includes(topic.topic_id);
+                return (
+                  <button
+                    id={`${listboxId}-option-${topic.topic_id}`}
+                    role="option"
+                    aria-selected={selected}
+                    className={index === activeIndex ? "active" : ""}
+                    key={topic.topic_id}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => updateSelection(topic.topic_id)}
+                  >
+                    <span>{topic.topic_name}</span>
+                    <span aria-hidden="true">{selected ? "Selected" : "Add"}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="topic-options-empty" role="status">
+              {!subjectId
+                ? "Choose a subject to browse topics."
+                : search.trim()
+                  ? "No topics match your search."
+                  : unitId
+                    ? "No topics are available in this unit."
+                    : "No topics are available for this subject."}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PaperQuestionEditor({
+  question,
+  index,
+  questionTypes,
+  topics,
+  units,
+  subjectId,
+  onChange,
+  onRemove
+}) {
   function update(field, value) {
     onChange(index, { ...question, [field]: value });
   }
@@ -135,22 +305,13 @@ function PaperQuestionEditor({ question, index, questionTypes, topics, onChange,
           onChange={(event) => update("question_text", event.target.value)}
         />
       </label>
-      <label>
-        Topic(s)
-        <select
-          multiple
-          size={Math.min(Math.max(topics.length, 3), 6)}
-          value={question.topic_ids.map(String)}
-          onChange={(event) => update(
-            "topic_ids",
-            Array.from(event.target.selectedOptions, (option) => Number(option.value))
-          )}
-        >
-          {topics.map((topic) => (
-            <option value={topic.topic_id} key={topic.topic_id}>{topic.topic_name}</option>
-          ))}
-        </select>
-      </label>
+      <TopicMultiSelect
+        question={question}
+        topics={topics}
+        units={units}
+        subjectId={subjectId}
+        onChange={(topicIds) => update("topic_ids", topicIds)}
+      />
       <button className="secondary-btn remove-question" type="button" onClick={() => onRemove(index)}>
         Remove question
       </button>
@@ -165,6 +326,7 @@ export default function HomePage() {
   const [semesters, setSemesters] = useState([]);
   const [questionTypes, setQuestionTypes] = useState([]);
   const [topics, setTopics] = useState([]);
+  const [units, setUnits] = useState([]);
   const [overview, setOverview] = useState(null);
   const [comparison, setComparison] = useState([]);
   const [patterns, setPatterns] = useState(null);
@@ -252,17 +414,19 @@ export default function HomePage() {
           apiFetch("/api/v1/catalog/subjects"),
           apiFetch("/api/v1/catalog/semesters"),
           apiFetch("/api/v1/catalog/question-types"),
-          apiFetch("/api/v1/catalog/topics")
+          apiFetch("/api/v1/catalog/topics"),
+          apiFetch("/api/v1/catalog/units")
         ]),
         apiFetch("/api/v1/auth/me")
       ]);
       if (!active) return;
       if (catalogResult.status === "fulfilled") {
-        const [subjectList, semesterList, typeList, topicList] = catalogResult.value;
+        const [subjectList, semesterList, typeList, topicList, unitList] = catalogResult.value;
         setSubjects(subjectList);
         setSemesters(semesterList);
         setQuestionTypes(typeList);
         setTopics(topicList);
+        setUnits(unitList);
       } else {
         initializationErrors.push(
           catalogResult.reason?.message || "Unable to load the academic catalog."
@@ -413,19 +577,7 @@ export default function HomePage() {
       return;
     }
 
-    const payload = {
-      subject_id: Number(paperForm.subject_id),
-      semester_id: Number(paperForm.semester_id),
-      exam_type: paperForm.exam_type,
-      total_marks: Number(paperForm.total_marks),
-      questions: paperForm.questions.map((question) => ({
-        question_number: question.question_number.trim(),
-        marks: Number(question.marks),
-        question_text: question.question_text.trim(),
-        question_type_id: Number(question.question_type_id),
-        topic_ids: question.topic_ids
-      }))
-    };
+    const payload = buildPaperPayload(paperForm);
 
     if (
       !payload.subject_id || !payload.semester_id || !payload.total_marks ||
@@ -847,6 +999,8 @@ export default function HomePage() {
                         index={index}
                         questionTypes={questionTypes}
                         topics={topics}
+                        units={units}
+                        subjectId={paperForm.subject_id}
                         onChange={updateQuestion}
                         onRemove={removeQuestion}
                       />

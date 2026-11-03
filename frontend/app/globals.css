@@ -376,6 +376,102 @@ button:hover {
   gap: 16px;
 }
 
+.topic-selector {
+  display: grid;
+  gap: 8px;
+}
+
+.topic-selector > label {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.topic-selected-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.topic-selection-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-alt);
+  color: var(--primary-strong);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.topic-selection-chip button {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--primary-strong);
+  line-height: 1;
+}
+
+.topic-selection-chip button:hover,
+.topic-selection-chip button:focus-visible {
+  background: #dce7ff;
+}
+
+.topic-selector-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.65fr);
+  gap: 8px;
+}
+
+.topic-selector-controls input,
+.topic-selector-controls select {
+  min-width: 0;
+  margin: 0;
+}
+
+.topic-options {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.topic-options [role="option"] {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.topic-options [role="option"] span:last-child {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.topic-options [role="option"]:hover,
+.topic-options [role="option"].active {
+  background: var(--panel-alt);
+}
+
+.topic-options-empty {
+  margin: 0;
+  padding: 12px;
+  color: var(--muted);
+}
+
 textarea {
   width: 100%;
   min-height: 100px;
@@ -413,10 +509,6 @@ textarea {
 
 .status-message.error {
   color: #d12c4f;
-}
-
-select[multiple] {
-  min-height: 120px;
 }
 
 body {
@@ -527,6 +619,12 @@ button:disabled {
 
   .topbar {
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .topic-selector-controls {
+    grid-template-columns: 1fr;
   }
 }
 
