@@ -2,6 +2,7 @@ import math
 from typing import Iterable
 
 from app.services.pgvector_search import model_encode_text
+from app.sql_loader import execute_sql
 
 
 class VectorIndex:
@@ -68,9 +69,7 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
 
 def index_all_questions(session) -> int:
     index = get_vector_index()
-    rows = session.execute(
-        "SELECT question_id, question_text FROM question ORDER BY question_id"
-    ).all()
+    rows = execute_sql(session, "semantics.sql", "index_questions").all()
     for question_id, question_text in rows:
         index.upsert(question_id, question_text)
     return len(rows)

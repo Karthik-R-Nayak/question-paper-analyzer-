@@ -21,10 +21,10 @@ each part easier to test and maintain.
 | Paper ingestion | Add an exam paper, enter or extract its questions, and associate it with a subject, semester, and exam type. |
 | Academic catalog | Manage subjects, semesters, units, topics, and question types. |
 | Question and paper management | Store questions and their marks/question numbers on papers; connect questions to one or more syllabus topics. |
-| Database access | Own relational persistence, transactions, validation, and queries for the tables in `exam_pattern_ddl.sql`. |
+| Database access | Own relational persistence, transactions, validation, and queries for the tables in `backend/app/sql/schema.sql`. |
 | Semantic search | Create embeddings for question text, store them in a vector index, and retrieve semantically similar questions. |
 | Pattern analytics | Calculate topic and unit weightage, topic frequency, question-type distribution, recurring concepts, and trends across semesters. |
-| API and user interface | Expose the application features and let students search questions, explore statistics, and compare historical patterns. |
+| API and user interface | FastAPI exposes the application features; a Next.js frontend lets students search questions, explore statistics, and compare historical patterns. |
 
 ### Suggested boundaries and data flow
 
@@ -42,11 +42,11 @@ from saved question text.
 - **Backend/API:** Python with FastAPI
 - **Relational and vector storage:** PostgreSQL with the `pgvector` extension
 - **Embeddings:** a sentence-transformer model, wrapped behind the semantic search module
-- **Frontend:** React with TypeScript
+- **Frontend:** Next.js App Router with React and JavaScript (`frontend/`)
 
 Using PostgreSQL with `pgvector` keeps structured records and vector search in
 one database for an initial implementation. The current
-`exam_pattern_ddl.sql` is PostgreSQL-compatible. Create and connect to the
+`backend/app/sql/schema.sql` is the canonical PostgreSQL schema. Create and connect to the
 `exam_pattern` database before running it.
 
 ### First module: paper ingestion
@@ -66,7 +66,7 @@ The academic catalog API manages subjects, semesters, units, topics, and
 question types under `/api/v1/catalog`. Each catalog resource supports
 create, list, get, and replace operations, plus deletion. Updates use `PUT`.
 Unique-key and relational conflicts return `409`; missing records return `404`.
-Deletes follow the foreign-key behavior in `exam_pattern_ddl.sql`, so deleting
+Deletes follow the foreign-key behavior in `backend/app/sql/schema.sql`, so deleting
 a subject, semester, unit, or topic can cascade to related historical records.
 A question type cannot be deleted while questions use it.
 
@@ -102,7 +102,7 @@ The database layer owns SQLAlchemy engine and session creation. Set
 `DATABASE_URL` to choose the database; SQLite connections enforce the schema's
 foreign-key and cascade rules just like PostgreSQL. On startup, the API creates
 missing tables automatically for SQLite databases. For PostgreSQL, apply
-`exam_pattern_ddl.sql` before starting the application.
+`backend/app/sql/schema.sql` before starting the application.
 
 To run the API locally:
 
@@ -112,12 +112,12 @@ To run the API locally:
 
    ```sh
    createdb exam_pattern
-   psql -d exam_pattern -c "CREATE EXTENSION IF NOT EXISTS vector;"
-   psql -d exam_pattern -f exam_pattern_ddl.sql
+   psql -d exam_pattern -f backend/app/sql/schema.sql
    ```
 
-   The extension must be enabled before applying the schema because
-   `QUESTION_EMBEDDING.embedding` uses the PostgreSQL `VECTOR(384)` type.
+   The schema enables pgvector and creates only missing tables/indexes; it does
+   not alter or drop existing objects. `QUESTION_EMBEDDING.embedding` uses
+   PostgreSQL `VECTOR(384)`.
 2. Install dependencies with `pip install -r backend/requirements.txt`.
 3. Set `DATABASE_URL` to
    `postgresql+psycopg://USER:PASSWORD@localhost:5432/exam_pattern` in
@@ -130,3 +130,106 @@ To run the API locally:
 
 Install `backend/requirements-dev.txt` and run `pytest` from the `backend`
 directory to execute the tests using an in-memory SQLite database.
+
+### Consolidated SQL resources
+
+Production SQL is organized by application functionality under
+`backend/app/sql/`. The Python `app.sql_loader` reads named statements from
+these files and executes them through SQLAlchemy `text()` with bound named
+parameters. SQLAlchemy continues to own connections, sessions, transactions,
+and ORM operations. SQLite tests continue to create their schema from the
+SQLAlchemy models; PostgreSQL setup uses `schema.sql`.
+
+```text
+backend/app/sql/
+├── schema.sql      # PostgreSQL tables, constraints, indexes, and pgvector
+├── questions.sql   # Question CRUD, search, filters, and topic joins
+├── papers.sql      # Paper CRUD, paper-question relations, retrieval joins
+├── analytics.sql   # Production analytics and commented SQL demonstrations
+└── semantics.sql   # Embedding operations and semantic retrieval
+```
+
+In `analytics.sql`, statements marked as production are the ones called by the
+API. Demonstration queries are commented out and are not loaded or executed.
+
+## Next.js frontend
+
+The Next.js App Router frontend is the user-facing application. It calls the
+existing FastAPI REST API; PostgreSQL and pgvector remain behind FastAPI. The
+original HTML/vanilla JavaScript UI remains available from the backend's `/`
+route while the migration is in use.
+
+```text
+frontend/
+├── app/
+│   ├── globals.css
+│   ├── layout.js
+│   └── page.js
+├── lib/
+│   ├── api.js
+│   └── api.test.js
+├── .env.local.example
+├── package-lock.json
+├── next.config.mjs
+└── package.json
+```
+
+### Configure and start both applications
+
+1. Follow the PostgreSQL/pgvector setup above. In `backend/.env`, set
+   `DATABASE_URL` to
+   `postgresql+psycopg://USER:PASSWORD@localhost:5432/exam_pattern`.
+2. For local HTTP development, set `SESSION_COOKIE_SECURE=false` in
+   `backend/.env`. The default is secure cookies, which require HTTPS.
+3. Configure the allowed browser origin in `backend/.env`:
+   `FRONTEND_ORIGIN=http://localhost:3000`. FastAPI permits credentialed CORS
+   requests from this single configured origin.
+4. In a backend terminal:
+
+   ```sh
+   cd backend
+   pip install -r requirements.txt
+   uvicorn app.main:app --reload --host localhost --port 8000
+   ```
+
+5. In another terminal, copy `frontend/.env.local.example` to
+   `frontend/.env.local`. Set `NEXT_PUBLIC_API_URL=http://localhost:8000` if
+   the API uses a different address. Then start Next.js:
+
+   ```sh
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+6. Open `http://localhost:3000`. The API can also be explored at
+   `http://localhost:8000/docs`.
+
+The frontend API client centralizes JSON/error handling and sends requests with
+`credentials: "include"` so the browser stores and returns FastAPI's HttpOnly
+session cookie. Keep the frontend and API on `localhost` during HTTP
+development; do not put database credentials or session secrets in
+`NEXT_PUBLIC_*` variables.
+
+### Migrated frontend features
+
+- Overview totals, question-type/topic charts, semester comparison, unit
+  weightage, and recurring concepts use the existing analytics APIs. Subject,
+  semester, and exam-type filters apply to overview and pattern analytics; the
+  existing semester-comparison endpoint supports only a subject filter.
+- Question search uses `/api/v1/search/questions` with text and catalog filters.
+- Semantic search uses `/api/v1/semantic/similar`, displays ranked similarity
+  scores, and shows API errors such as HTTP 503 when the embedding model is
+  unavailable.
+- Login/register, current-session restoration, and logout use the existing
+  cookie-backed `/api/v1/auth` endpoints.
+- Paper creation (including multiple questions in one request), listing,
+  editing, and deletion use the existing `/api/v1/papers` endpoints.
+
+There is no CSV or file-upload endpoint in the current backend. Bulk question
+entry is supported by submitting multiple questions as part of a paper JSON
+request. No new import endpoint or database schema is introduced by this
+frontend migration.
+
+Frontend checks: `npm test` and `npm run build` from `frontend/`. Backend
+checks: install `backend/requirements-dev.txt` and run `pytest` from `backend/`.

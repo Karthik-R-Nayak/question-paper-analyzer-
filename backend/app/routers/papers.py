@@ -1,19 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_session
 from app.services.pgvector_search import upsert_question_embedding
+from app.sql_loader import execute_sql
 from app.models import (
-    ExamPaper,
-    PaperQuestion,
-    Question,
-    QuestionTopic,
     QuestionType,
     Semester,
     Subject,
-    Topic,
-    Unit,
 )
 from app.schemas import PaperCreate, PaperQuestionCreate, PaperQuestionRead, PaperRead
 from app.security import require_user
@@ -21,8 +15,13 @@ from app.security import require_user
 router = APIRouter(prefix="/api/v1/papers", tags=["papers"])
 
 
-def _require_paper(session: Session, paper_id: int) -> ExamPaper:
-    paper = session.get(ExamPaper, paper_id)
+def _require_paper(session: Session, paper_id: int):
+    paper = execute_sql(
+        session,
+        "papers.sql",
+        "get_paper",
+        {"paper_id": paper_id},
+    ).first()
     if paper is None:
         raise HTTPException(status_code=404, detail=f"Paper not found: {paper_id}")
     return paper
@@ -54,10 +53,12 @@ def _validate_questions(
     if not topic_ids:
         return
 
-    topic_subjects = session.execute(
-        select(Topic.topic_id, Unit.subject_id)
-        .join(Unit, Topic.unit_id == Unit.unit_id)
-        .where(Topic.topic_id.in_(topic_ids))
+    topic_subjects = execute_sql(
+        session,
+        "papers.sql",
+        "topic_subjects_for_paper",
+        {"topic_ids": sorted(topic_ids)},
+        expanding_parameters=("topic_ids",),
     ).all()
     subjects_by_topic = {topic_id: subject_id for topic_id, subject_id in topic_subjects}
     missing_topics = topic_ids - subjects_by_topic.keys()
@@ -86,32 +87,41 @@ def _add_question(
     paper_id: int,
     question_data: PaperQuestionCreate,
 ) -> PaperQuestionRead:
-    question = Question(
-        type_id=question_data.question_type_id,
-        question_text=question_data.question_text,
-    )
-    session.add(question)
-    session.flush()
+    question_id = execute_sql(
+        session,
+        "questions.sql",
+        "insert_question",
+        {
+            "type_id": question_data.question_type_id,
+            "question_text": question_data.question_text,
+        },
+    ).scalar_one()
     upsert_question_embedding(
         session,
-        question.question_id,
+        question_id,
         question_data.question_text,
         commit=False,
     )
-    session.add(
-        PaperQuestion(
-            paper_id=paper_id,
-            question_id=question.question_id,
-            question_number=question_data.question_number,
-            marks=question_data.marks,
+    execute_sql(
+        session,
+        "papers.sql",
+        "insert_paper_question",
+        {
+            "paper_id": paper_id,
+            "question_id": question_id,
+            "question_number": question_data.question_number,
+            "marks": question_data.marks,
+        },
+    )
+    for topic_id in question_data.topic_ids:
+        execute_sql(
+            session,
+            "questions.sql",
+            "insert_question_topic",
+            {"question_id": question_id, "topic_id": topic_id},
         )
-    )
-    session.add_all(
-        QuestionTopic(question_id=question.question_id, topic_id=topic_id)
-        for topic_id in question_data.topic_ids
-    )
     return PaperQuestionRead(
-        question_id=question.question_id,
+        question_id=question_id,
         question_number=question_data.question_number,
         marks=question_data.marks,
         question_text=question_data.question_text,
@@ -120,39 +130,47 @@ def _add_question(
     )
 
 
-def _paper_read(session: Session, paper: ExamPaper) -> PaperRead:
-    rows = session.execute(
-        select(PaperQuestion, Question)
-        .join(Question, Question.question_id == PaperQuestion.question_id)
-        .where(PaperQuestion.paper_id == paper.paper_id)
-        .order_by(PaperQuestion.question_number, PaperQuestion.question_id)
+def _paper_read(session: Session, paper_id: int) -> PaperRead:
+    rows = execute_sql(
+        session,
+        "papers.sql",
+        "paper_question_details",
+        {"paper_id": paper_id},
     ).all()
-    question_ids = [question.question_id for _link, question in rows]
-    topic_rows = session.execute(
-        select(QuestionTopic.question_id, QuestionTopic.topic_id)
-        .where(QuestionTopic.question_id.in_(question_ids))
-        .order_by(QuestionTopic.topic_id)
-    ).all() if question_ids else []
+    first_row = rows[0]
+    question_ids = [row.question_id for row in rows if row.question_id is not None]
+    topic_rows = (
+        execute_sql(
+            session,
+            "papers.sql",
+            "paper_question_topic_ids",
+            {"question_ids": question_ids},
+            expanding_parameters=("question_ids",),
+        ).all()
+        if question_ids
+        else []
+    )
     topic_ids_by_question: dict[int, list[int]] = {}
     for question_id, topic_id in topic_rows:
         topic_ids_by_question.setdefault(question_id, []).append(topic_id)
 
     return PaperRead(
-        paper_id=paper.paper_id,
-        subject_id=paper.subject_id,
-        semester_id=paper.semester_id,
-        exam_type=paper.exam_type,
-        total_marks=paper.total_marks,
+        paper_id=first_row.paper_id,
+        subject_id=first_row.subject_id,
+        semester_id=first_row.semester_id,
+        exam_type=first_row.exam_type,
+        total_marks=first_row.total_marks,
         questions=[
             PaperQuestionRead(
-                question_id=question.question_id,
-                question_number=link.question_number,
-                marks=link.marks,
-                question_text=question.question_text,
-                question_type_id=question.type_id,
-                topic_ids=topic_ids_by_question.get(question.question_id, []),
+                question_id=row.question_id,
+                question_number=row.question_number,
+                marks=row.marks,
+                question_text=row.question_text,
+                question_type_id=row.question_type_id,
+                topic_ids=topic_ids_by_question.get(row.question_id, []),
             )
-            for link, question in rows
+            for row in rows
+            if row.question_id is not None
         ],
     )
 
@@ -162,16 +180,34 @@ def _delete_orphaned_questions(session: Session, question_ids: set[int]) -> None
         return
     session.flush()
     remaining_ids = set(
-        session.scalars(
-            select(PaperQuestion.question_id).where(
-                PaperQuestion.question_id.in_(question_ids)
-            )
-        )
+        row.question_id
+        for row in execute_sql(
+            session,
+            "papers.sql",
+            "paper_question_ids_in_papers",
+            {"question_ids": sorted(question_ids)},
+            expanding_parameters=("question_ids",),
+        ).all()
     )
     for question_id in question_ids - remaining_ids:
-        question = session.get(Question, question_id)
-        if question is not None:
-            session.delete(question)
+        execute_sql(
+            session,
+            "questions.sql",
+            "delete_question_topics",
+            {"question_id": question_id},
+        )
+        execute_sql(
+            session,
+            "semantics.sql",
+            "delete_question_embedding",
+            {"question_id": question_id},
+        )
+        execute_sql(
+            session,
+            "questions.sql",
+            "delete_question",
+            {"question_id": question_id},
+        )
 
 
 @router.post(
@@ -193,26 +229,28 @@ def create_paper(payload: PaperCreate, session: Session = Depends(get_session)) 
         _require_existing(session, Semester, payload.semester_id, "semester")
         _validate_questions(session, payload.subject_id, payload.questions)
 
-        paper = ExamPaper(
-            subject_id=payload.subject_id,
-            semester_id=payload.semester_id,
-            exam_type=payload.exam_type.value,
-            total_marks=payload.total_marks,
-        )
-        session.add(paper)
-        session.flush()
+        paper_id = execute_sql(
+            session,
+            "papers.sql",
+            "insert_paper",
+            {
+                "subject_id": payload.subject_id,
+                "semester_id": payload.semester_id,
+                "exam_type": payload.exam_type.value,
+                "total_marks": payload.total_marks,
+            },
+        ).scalar_one()
 
         response_questions = [
-            _add_question(session, paper.paper_id, question_data)
+            _add_question(session, paper_id, question_data)
             for question_data in payload.questions
         ]
-        session.flush()
         response = PaperRead(
-            paper_id=paper.paper_id,
-            subject_id=paper.subject_id,
-            semester_id=paper.semester_id,
+            paper_id=paper_id,
+            subject_id=payload.subject_id,
+            semester_id=payload.semester_id,
             exam_type=payload.exam_type,
-            total_marks=paper.total_marks,
+            total_marks=payload.total_marks,
             questions=response_questions,
         )
 
@@ -221,8 +259,8 @@ def create_paper(payload: PaperCreate, session: Session = Depends(get_session)) 
 
 @router.get("", response_model=list[PaperRead])
 def list_papers(session: Session = Depends(get_session)) -> list[PaperRead]:
-    papers = session.scalars(select(ExamPaper).order_by(ExamPaper.paper_id)).all()
-    return [_paper_read(session, paper) for paper in papers]
+    papers = execute_sql(session, "papers.sql", "list_papers").all()
+    return [_paper_read(session, paper.paper_id) for paper in papers]
 
 
 @router.get("/{paper_id}", response_model=PaperRead)
@@ -230,7 +268,8 @@ def get_paper(
     paper_id: int = Path(gt=0),
     session: Session = Depends(get_session),
 ) -> PaperRead:
-    return _paper_read(session, _require_paper(session, paper_id))
+    _require_paper(session, paper_id)
+    return _paper_read(session, paper_id)
 
 
 @router.put(
@@ -251,31 +290,43 @@ def update_paper(
         )
 
     with session.begin():
-        paper = _require_paper(session, paper_id)
+        _require_paper(session, paper_id)
         _require_existing(session, Subject, payload.subject_id, "subject")
         _require_existing(session, Semester, payload.semester_id, "semester")
         _validate_questions(session, payload.subject_id, payload.questions)
 
-        old_question_ids = set(
-            session.scalars(
-                select(PaperQuestion.question_id).where(
-                    PaperQuestion.paper_id == paper_id
-                )
-            )
+        old_question_ids = {
+            row.question_id
+            for row in execute_sql(
+                session,
+                "papers.sql",
+                "paper_question_ids",
+                {"paper_id": paper_id},
+            ).all()
+        }
+        execute_sql(
+            session,
+            "papers.sql",
+            "delete_paper_questions",
+            {"paper_id": paper_id},
         )
-        session.query(PaperQuestion).filter(
-            PaperQuestion.paper_id == paper_id
-        ).delete(synchronize_session=False)
-        paper.subject_id = payload.subject_id
-        paper.semester_id = payload.semester_id
-        paper.exam_type = payload.exam_type.value
-        paper.total_marks = payload.total_marks
-        _delete_orphaned_questions(session, old_question_ids)
+        execute_sql(
+            session,
+            "papers.sql",
+            "update_paper",
+            {
+                "paper_id": paper_id,
+                "subject_id": payload.subject_id,
+                "semester_id": payload.semester_id,
+                "exam_type": payload.exam_type.value,
+                "total_marks": payload.total_marks,
+            },
+        )
 
         for question_data in payload.questions:
-            _add_question(session, paper.paper_id, question_data)
-        session.flush()
-        response = _paper_read(session, paper)
+            _add_question(session, paper_id, question_data)
+        _delete_orphaned_questions(session, old_question_ids)
+        response = _paper_read(session, paper_id)
 
     return response
 
@@ -290,16 +341,22 @@ def delete_paper(
     session: Session = Depends(get_session),
 ) -> Response:
     with session.begin():
-        paper = _require_paper(session, paper_id)
-        question_ids = set(
-            session.scalars(
-                select(PaperQuestion.question_id).where(
-                    PaperQuestion.paper_id == paper_id
-                )
-            )
+        _require_paper(session, paper_id)
+        question_ids = {
+            row.question_id
+            for row in execute_sql(
+                session,
+                "papers.sql",
+                "paper_question_ids",
+                {"paper_id": paper_id},
+            ).all()
+        }
+        execute_sql(
+            session,
+            "papers.sql",
+            "delete_paper",
+            {"paper_id": paper_id},
         )
-        session.delete(paper)
-        session.flush()
         _delete_orphaned_questions(session, question_ids)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -318,13 +375,17 @@ def add_paper_question(
     with session.begin():
         paper = _require_paper(session, paper_id)
         _validate_questions(session, paper.subject_id, [payload])
-        duplicate_number = session.scalar(
-            select(PaperQuestion.question_id).where(
-                PaperQuestion.paper_id == paper_id,
-                PaperQuestion.question_number == payload.question_number,
-            )
+        duplicate_number = execute_sql(
+            session,
+            "papers.sql",
+            "question_number_conflict",
+            {
+                "paper_id": paper_id,
+                "question_number": payload.question_number,
+                "exclude_question_id": None,
+            },
         )
-        if duplicate_number is not None:
+        if duplicate_number.first() is not None:
             raise HTTPException(
                 status_code=409,
                 detail="Question number already exists in this paper.",
@@ -347,44 +408,74 @@ def update_paper_question(
 ) -> PaperQuestionRead:
     with session.begin():
         paper = _require_paper(session, paper_id)
-        link = session.get(PaperQuestion, (paper_id, question_id))
+        link = execute_sql(
+            session,
+            "papers.sql",
+            "paper_question_exists",
+            {"paper_id": paper_id, "question_id": question_id},
+        ).first()
         if link is None:
             raise HTTPException(
                 status_code=404,
                 detail=f"Question {question_id} not found in paper {paper_id}.",
             )
         _validate_questions(session, paper.subject_id, [payload])
-        duplicate_number = session.scalar(
-            select(PaperQuestion.question_id).where(
-                PaperQuestion.paper_id == paper_id,
-                PaperQuestion.question_number == payload.question_number,
-                PaperQuestion.question_id != question_id,
-            )
+        duplicate_number = execute_sql(
+            session,
+            "papers.sql",
+            "question_number_conflict",
+            {
+                "paper_id": paper_id,
+                "question_number": payload.question_number,
+                "exclude_question_id": question_id,
+            },
         )
-        if duplicate_number is not None:
+        if duplicate_number.first() is not None:
             raise HTTPException(
                 status_code=409,
                 detail="Question number already exists in this paper.",
             )
 
-        question = session.get(Question, question_id)
-        link.question_number = payload.question_number
-        link.marks = payload.marks
-        question.type_id = payload.question_type_id
-        question.question_text = payload.question_text
+        execute_sql(
+            session,
+            "papers.sql",
+            "update_paper_question",
+            {
+                "paper_id": paper_id,
+                "question_id": question_id,
+                "question_number": payload.question_number,
+                "marks": payload.marks,
+            },
+        )
+        execute_sql(
+            session,
+            "questions.sql",
+            "update_question",
+            {
+                "question_id": question_id,
+                "type_id": payload.question_type_id,
+                "question_text": payload.question_text,
+            },
+        )
         upsert_question_embedding(
             session,
-            question.question_id,
-            question.question_text,
+            question_id,
+            payload.question_text,
             commit=False,
         )
-        session.query(QuestionTopic).filter(
-            QuestionTopic.question_id == question_id
-        ).delete(synchronize_session=False)
-        session.add_all(
-            QuestionTopic(question_id=question_id, topic_id=topic_id)
-            for topic_id in payload.topic_ids
+        execute_sql(
+            session,
+            "questions.sql",
+            "delete_question_topics",
+            {"question_id": question_id},
         )
+        for topic_id in payload.topic_ids:
+            execute_sql(
+                session,
+                "questions.sql",
+                "insert_question_topic",
+                {"question_id": question_id, "topic_id": topic_id},
+            )
         response = PaperQuestionRead(
             question_id=question_id,
             question_number=payload.question_number,
@@ -408,12 +499,22 @@ def delete_paper_question(
 ) -> Response:
     with session.begin():
         _require_paper(session, paper_id)
-        link = session.get(PaperQuestion, (paper_id, question_id))
+        link = execute_sql(
+            session,
+            "papers.sql",
+            "paper_question_exists",
+            {"paper_id": paper_id, "question_id": question_id},
+        ).first()
         if link is None:
             raise HTTPException(
                 status_code=404,
                 detail=f"Question {question_id} not found in paper {paper_id}.",
             )
-        session.delete(link)
+        execute_sql(
+            session,
+            "papers.sql",
+            "delete_paper_question",
+            {"paper_id": paper_id, "question_id": question_id},
+        )
         _delete_orphaned_questions(session, {question_id})
     return Response(status_code=status.HTTP_204_NO_CONTENT)

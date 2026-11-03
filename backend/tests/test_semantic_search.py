@@ -1,5 +1,5 @@
 import sys
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -149,3 +149,50 @@ def test_indexes_questions_and_returns_similar_questions(monkeypatch):
     results = search_response.json()
     assert results[0]["question_text"] == "Explain the relational model."
     assert results[0]["similarity_score"] == 1.0
+
+
+def test_postgresql_semantic_search_uses_loaded_pgvector_query(monkeypatch):
+    class FakeResult:
+        def all(self):
+            return [
+                SimpleNamespace(
+                    question_id=7,
+                    question_text="Explain vector search.",
+                    similarity=0.91234,
+                )
+            ]
+
+    class FakeSession:
+        def execute(self, statement, parameters):
+            self.statement = str(statement)
+            self.parameters = parameters
+            return FakeResult()
+
+    session = FakeSession()
+    monkeypatch.setattr(pgvector_search, "is_postgres_enabled", lambda: True)
+    monkeypatch.setattr(
+        pgvector_search,
+        "ensure_pgvector_extension",
+        lambda _session: None,
+    )
+    monkeypatch.setattr(
+        pgvector_search,
+        "model_encode_text",
+        lambda _query: [0.25, 0.75],
+    )
+
+    results = pgvector_search.similar_questions(session, "vector search", limit=3)
+
+    assert "<=>" in session.statement
+    assert "CAST(:query_embedding AS vector)" in session.statement
+    assert session.parameters == {
+        "query_embedding": "[0.25,0.75]",
+        "limit": 3,
+    }
+    assert results == [
+        {
+            "question_id": 7,
+            "question_text": "Explain vector search.",
+            "similarity_score": 0.9123,
+        }
+    ]
