@@ -10,7 +10,7 @@ The system is intended to provide evidence-based examination insights rather tha
 <img width="903" height="1310" alt="image" src="https://github.com/user-attachments/assets/29481e40-4abe-4578-8a8d-612d9420c7b4" />
 <img width="1673" height="660" alt="image" src="https://github.com/user-attachments/assets/cab50a28-cad9-473b-9292-3a394fe498ca" />
 
-## Suggested project modules
+##  project modules
 
 Build the first version as a **modular monolith**: one application with clear
 module boundaries. This keeps deployment and development simple while making
@@ -26,7 +26,7 @@ each part easier to test and maintain.
 | Pattern analytics | Calculate topic and unit weightage, topic frequency, question-type distribution, recurring concepts, and trends across semesters. |
 | API and user interface | FastAPI exposes the application features; a Next.js frontend lets students search questions, explore statistics, and compare historical patterns. |
 
-### Suggested boundaries and data flow
+### boundaries and data flow
 
 1. Paper ingestion validates a paper and its questions, then asks the question/paper and academic catalog modules to save the structured data.
 2. When a question is saved or updated, semantic search generates and stores its embedding in the same transaction. Keep the relational `question_id` as the stable link to the vector record; do not treat a vector-store ID as the question itself.
@@ -37,7 +37,7 @@ Keep the relational database as the source of truth for papers, marks, subjects,
 and syllabus mappings. Treat embeddings as derived data that can be regenerated
 from saved question text.
 
-### Recommended starter stack
+###stack
 
 - **Backend/API:** Python with FastAPI
 - **Relational and vector storage:** PostgreSQL with the `pgvector` extension
